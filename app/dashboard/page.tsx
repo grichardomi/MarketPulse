@@ -234,6 +234,23 @@ export default function Dashboard() {
             </Link>
           </div>
 
+          {/* Support */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+              <span className="text-2xl">💬</span>
+            </div>
+            <h3 className="text-lg font-semibold mb-2">Get Support</h3>
+            <p className="text-gray-600 text-sm mb-4">
+              Need help? Contact our support team or view your existing tickets.
+            </p>
+            <Link
+              href="/dashboard/support"
+              className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm"
+            >
+              Contact Support
+            </Link>
+          </div>
+
           {/* Security Settings */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
@@ -253,7 +270,7 @@ export default function Dashboard() {
 
           {/* Notification Settings */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
               <span className="text-2xl">⚙️</span>
             </div>
             <h3 className="text-lg font-semibold mb-2">Notifications</h3>
@@ -262,7 +279,7 @@ export default function Dashboard() {
             </p>
             <Link
               href="/dashboard/settings"
-              className="inline-block px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm"
+              className="inline-block px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium text-sm"
             >
               View Settings
             </Link>
@@ -357,6 +374,18 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Floating Help Button */}
+        <Link
+          href="/dashboard/support"
+          className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-30 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-110 group"
+          title="Get Support"
+        >
+          <span className="text-2xl">💬</span>
+          <span className="absolute right-full mr-3 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+            Need help?
+          </span>
+        </Link>
       </main>
   );
 }

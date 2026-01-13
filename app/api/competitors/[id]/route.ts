@@ -3,6 +3,7 @@ import { authOptions } from '@/lib/auth/auth-options';
 import { db } from '@/lib/db/prisma';
 import { updateCompetitorSchema } from '@/lib/validation/competitor';
 import { normalizeUrl } from '@/lib/utils/format';
+import { getHistoryRetentionDays } from '@/lib/config/pricing';
 
 export async function GET(
   _req: Request,
@@ -26,6 +27,32 @@ export async function GET(
       return Response.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Get user's subscription to determine history retention
+    const subscription = await db.subscription.findFirst({
+      where: { userId: user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Determine history cutoff date and limit based on subscription tier
+    let historyCutoffDate: Date | null = null;
+    let snapshotLimit: number | undefined = undefined;
+
+    if (subscription) {
+      const retentionDays = getHistoryRetentionDays(subscription.stripePriceId);
+      if (retentionDays !== null) {
+        historyCutoffDate = new Date();
+        historyCutoffDate.setDate(historyCutoffDate.getDate() - retentionDays);
+        // Calculate reasonable limit based on retention (2x per day = ~2 snapshots/day)
+        snapshotLimit = Math.ceil(retentionDays * 2.5); // Add buffer for variance
+      } else {
+        // Unlimited plan - set high limit but not infinite for performance
+        snapshotLimit = 1000;
+      }
+    } else {
+      // Default for trial users
+      snapshotLimit = 60; // 30 days * 2/day
+    }
+
     // Get competitor and verify ownership
     const competitor = await db.competitor.findFirst({
       where: {
@@ -39,7 +66,12 @@ export async function GET(
           orderBy: { createdAt: 'desc' },
         },
         PriceSnapshot: {
-          take: 30,
+          where: historyCutoffDate ? {
+            detectedAt: {
+              gte: historyCutoffDate,
+            },
+          } : undefined,
+          take: snapshotLimit,
           orderBy: { detectedAt: 'desc' },
         },
       },

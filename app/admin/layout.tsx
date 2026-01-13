@@ -57,6 +57,9 @@ export default function AdminLayout({
               <Link href="/admin/subscriptions" className="text-gray-600 hover:text-gray-900 font-medium">
                 Subscriptions
               </Link>
+              <Link href="/admin/support" className="text-gray-600 hover:text-gray-900 font-medium">
+                Support
+              </Link>
               <Link href="/admin/system" className="text-gray-600 hover:text-gray-900 font-medium">
                 System
               </Link>

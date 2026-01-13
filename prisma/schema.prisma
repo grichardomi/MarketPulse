@@ -275,6 +275,7 @@ model User {
   SmsQueue                SmsQueue[]
   Subscription            Subscription[]
   WebhookDestination      WebhookDestination[]
+  SupportTicket           SupportTicket[]
 
   @@index([email])
   @@index([role])
@@ -373,5 +374,42 @@ model DiscoveryEvent {
   createdAt    DateTime @default(now())
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// SUPPORT TICKETS
+// ============================================================================
+
+model SupportTicket {
+  id           Int                   @id @default(autoincrement())
+  userId       Int
+  subject      String
+  description  String
+  status       String                @default("open") // open, in_progress, resolved, closed
+  priority     String                @default("standard") // standard, priority, dedicated
+  category     String?               // billing, technical, feature_request, other
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  resolvedAt   DateTime?
+  User         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages     SupportTicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
+model SupportTicketMessage {
+  id              Int           @id @default(autoincrement())
+  ticketId        Int
+  userId          Int?          // null if from admin
+  isAdminResponse Boolean       @default(false)
+  message         String
+  createdAt       DateTime      @default(now())
+  Ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
   @@index([createdAt])
 }

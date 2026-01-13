@@ -11,6 +11,8 @@ export interface PricingTier {
   price: number; // in cents
   displayPrice: string; // formatted for display (e.g., "$20")
   competitorLimit: number;
+  historyRetentionDays: number | null; // null means unlimited
+  supportTier: 'standard' | 'priority' | 'dedicated';
   features: string[];
   highlighted?: boolean;
 }
@@ -44,6 +46,8 @@ export const PRICING_PLANS: Record<string, PricingTier> = {
     price: getEnvNumber('STRIPE_STARTER_PRICE', 2000), // $20
     displayPrice: formatPrice(getEnvNumber('STRIPE_STARTER_PRICE', 2000)),
     competitorLimit: getEnvNumber('STRIPE_STARTER_LIMIT', 5),
+    historyRetentionDays: 30,
+    supportTier: 'standard',
     features: [
       '5 competitors',
       'Twice-daily tracking',
@@ -60,6 +64,8 @@ export const PRICING_PLANS: Record<string, PricingTier> = {
     price: getEnvNumber('STRIPE_PRO_PRICE', 5000), // $50
     displayPrice: formatPrice(getEnvNumber('STRIPE_PRO_PRICE', 5000)),
     competitorLimit: getEnvNumber('STRIPE_PRO_LIMIT', 15),
+    historyRetentionDays: 90,
+    supportTier: 'priority',
     features: [
       '15 competitors',
       'Twice-daily tracking',
@@ -77,6 +83,8 @@ export const PRICING_PLANS: Record<string, PricingTier> = {
     price: getEnvNumber('STRIPE_ENTERPRISE_PRICE', 20000), // $200
     displayPrice: formatPrice(getEnvNumber('STRIPE_ENTERPRISE_PRICE', 20000)),
     competitorLimit: getEnvNumber('STRIPE_ENTERPRISE_LIMIT', 50),
+    historyRetentionDays: null, // unlimited
+    supportTier: 'dedicated',
     features: [
       '50 competitors',
       'Twice-daily tracking',
@@ -120,10 +128,29 @@ export function getCompetitorLimit(priceId: string): number {
 }
 
 /**
+ * Get history retention days for a price ID
+ * Returns null for unlimited history
+ */
+export function getHistoryRetentionDays(priceId: string): number | null {
+  const plan = getPricingPlanByPriceId(priceId);
+  return plan?.historyRetentionDays ?? 30; // Default to 30 days if not found
+}
+
+/**
+ * Get support tier for a price ID
+ */
+export function getSupportTier(priceId: string): 'standard' | 'priority' | 'dedicated' {
+  const plan = getPricingPlanByPriceId(priceId);
+  return plan?.supportTier || 'standard';
+}
+
+/**
  * Trial configuration
  */
 export const TRIAL_CONFIG = {
   durationDays: getEnvNumber('TRIAL_DURATION_DAYS', 14),
   gracePeriodDays: getEnvNumber('TRIAL_GRACE_PERIOD_DAYS', 3),
   competitorLimit: getEnvNumber('TRIAL_COMPETITOR_LIMIT', 3),
+  historyRetentionDays: 30, // Trial gets 30-day history
+  supportTier: 'standard' as const,
 };

@@ -23,6 +23,7 @@ export default function Header({ subscription }: HeaderProps) {
     { label: 'Dashboard', href: '/dashboard', icon: '📊' },
     { label: 'Competitors', href: '/dashboard/competitors', icon: '👥' },
     { label: 'Alerts', href: '/dashboard/alerts', icon: '🔔' },
+    { label: 'Support', href: '/dashboard/support', icon: '💬' },
     { label: 'Billing', href: '/dashboard/billing', icon: '💳' },
     { label: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
   ];

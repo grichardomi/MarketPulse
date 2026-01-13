@@ -230,7 +230,7 @@ export default function CompetitorDetailPage() {
             </p>
           ) : (
             <div className="space-y-2">
-              {competitor.priceSnapshots.slice(0, 20).map((snapshot, idx) => {
+              {competitor.priceSnapshots.map((snapshot, idx) => {
                 let extractedData: any = {};
                 try {
                   extractedData = JSON.parse(snapshot.extractedData);
@@ -292,6 +292,12 @@ export default function CompetitorDetailPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {competitor.priceSnapshots.length >= 2 && (
+            <div className="mt-4 text-center text-sm text-gray-500">
+              Showing {competitor.priceSnapshots.length} snapshots
+              {competitor.priceSnapshots.length >= 50 && ' (based on your subscription plan)'}
             </div>
           )}
         </div>
