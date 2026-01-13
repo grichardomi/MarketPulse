@@ -99,7 +99,7 @@ export default async function Home() {
             </div>
             <h3 className="text-xl font-semibold mb-3">Add Competitors</h3>
             <p className="text-gray-600">
-              Simply paste your competitors' website URLs. Our AI automatically discovers and categorizes their offerings.
+              Simply paste your competitors&apos; website URLs. Our AI automatically discovers and categorizes their offerings.
             </p>
           </div>
           <div className="text-center">
@@ -261,7 +261,7 @@ export default async function Home() {
               ))}
             </div>
             <p className="text-gray-700 mb-4">
-              "MarketPulse saved me hours every week. I used to manually check 5 competitor websites daily. Now I just get alerts when something changes."
+              &quot;MarketPulse saved me hours every week. I used to manually check 5 competitor websites daily. Now I just get alerts when something changes.&quot;
             </p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
@@ -281,7 +281,7 @@ export default async function Home() {
               ))}
             </div>
             <p className="text-gray-700 mb-4">
-              "Caught a competitor launching a 20% off sale within 10 minutes. Adjusted our pricing immediately and didn't lose customers. Worth every penny."
+              &quot;Caught a competitor launching a 20% off sale within 10 minutes. Adjusted our pricing immediately and didn&apos;t lose customers. Worth every penny.&quot;
             </p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
@@ -301,7 +301,7 @@ export default async function Home() {
               ))}
             </div>
             <p className="text-gray-700 mb-4">
-              "Setup was incredibly easy. Added 3 competitors in under 5 minutes and already got my first alert. This is exactly what I needed."
+              &quot;Setup was incredibly easy. Added 3 competitors in under 5 minutes and already got my first alert. This is exactly what I needed.&quot;
             </p>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
