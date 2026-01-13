@@ -95,11 +95,6 @@ export function generateMetadata({
             'max-snippet': -1,
           },
         },
-    viewport: {
-      width: 'device-width',
-      initialScale: 1,
-      maximumScale: 5,
-    },
     verification: {
       google: 'your-google-site-verification-code', // Add actual code when available
       // yandex: 'your-yandex-verification-code',

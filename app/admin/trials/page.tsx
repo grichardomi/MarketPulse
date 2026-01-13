@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 
 interface Trial {
@@ -27,11 +27,7 @@ export default function AdminTrialsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  useEffect(() => {
-    loadTrials();
-  }, [filter]);
-
-  const loadTrials = async () => {
+  const loadTrials = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -48,7 +44,11 @@ export default function AdminTrialsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter]);
+
+  useEffect(() => {
+    loadTrials();
+  }, [loadTrials]);
 
   const extendTrial = async (userId: number, days: number) => {
     setActionLoading(`extend-${userId}`);

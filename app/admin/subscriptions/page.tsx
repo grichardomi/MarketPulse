@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 
 interface Subscription {
@@ -31,7 +31,7 @@ export default function AdminSubscriptionsPage() {
   const [status, setStatus] = useState('all');
   const [search, setSearch] = useState('');
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (plan !== 'all') params.append('plan', plan);
@@ -45,11 +45,11 @@ export default function AdminSubscriptionsPage() {
       setSubscriptions(data.subscriptions);
     }
     setLoading(false);
-  };
+  }, [plan, status, search]);
 
   useEffect(() => {
     fetchSubscriptions();
-  }, [plan, status, search]);
+  }, [fetchSubscriptions]);
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {

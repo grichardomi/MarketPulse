@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSubscription } from '@/lib/providers/SubscriptionProvider';
 
@@ -35,35 +35,30 @@ export default function Dashboard() {
   const [activityLimit, setActivityLimit] = useState(5);
   const [hasMoreActivity, setHasMoreActivity] = useState(false);
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    } else if (status === 'authenticated') {
-      // Check if onboarding is complete
-      checkOnboardingStatus();
-    }
-  }, [status, router]);
-
-  const checkOnboardingStatus = async () => {
+  const fetchRecentActivity = useCallback(async () => {
     try {
-      const res = await fetch('/api/onboarding/status');
+      const res = await fetch(`/api/alerts?limit=${activityLimit + 1}`);
       const data = await res.json();
 
-      if (!data.completed) {
-        // User hasn't completed onboarding, redirect to onboarding
-        router.push('/onboarding');
-      } else {
-        setCheckingStatus(false);
-        // Fetch dashboard stats
-        fetchDashboardStats();
+      if (data.alerts) {
+        const activity: ActivityItem[] = data.alerts.slice(0, activityLimit).map((alert: any) => ({
+          id: alert.id,
+          type: alert.alertType === 'price_change' ? 'price_change' : 'alert',
+          title: alert.alertType === 'price_change' ? 'Price Change Detected' : 'New Alert',
+          description: alert.message,
+          createdAt: alert.createdAt,
+          competitorName: alert.competitor?.name,
+        }));
+
+        setRecentActivity(activity);
+        setHasMoreActivity(data.alerts.length > activityLimit);
       }
     } catch (err) {
-      console.error('Failed to check onboarding status:', err);
-      setCheckingStatus(false);
+      console.error('Failed to fetch recent activity:', err);
     }
-  };
+  }, [activityLimit]);
 
-  const fetchDashboardStats = async () => {
+  const fetchDashboardStats = useCallback(async () => {
     try {
       // Fetch competitors
       const competitorsRes = await fetch('/api/competitors');
@@ -89,30 +84,35 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Failed to fetch dashboard stats:', err);
     }
-  };
+  }, [fetchRecentActivity]);
 
-  const fetchRecentActivity = async () => {
+  const checkOnboardingStatus = useCallback(async () => {
     try {
-      const res = await fetch(`/api/alerts?limit=${activityLimit + 1}`);
+      const res = await fetch('/api/onboarding/status');
       const data = await res.json();
 
-      if (data.alerts) {
-        const activity: ActivityItem[] = data.alerts.slice(0, activityLimit).map((alert: any) => ({
-          id: alert.id,
-          type: alert.alertType === 'price_change' ? 'price_change' : 'alert',
-          title: alert.alertType === 'price_change' ? 'Price Change Detected' : 'New Alert',
-          description: alert.message,
-          createdAt: alert.createdAt,
-          competitorName: alert.competitor?.name,
-        }));
-
-        setRecentActivity(activity);
-        setHasMoreActivity(data.alerts.length > activityLimit);
+      if (!data.completed) {
+        // User hasn't completed onboarding, redirect to onboarding
+        router.push('/onboarding');
+      } else {
+        setCheckingStatus(false);
+        // Fetch dashboard stats
+        fetchDashboardStats();
       }
     } catch (err) {
-      console.error('Failed to fetch recent activity:', err);
+      console.error('Failed to check onboarding status:', err);
+      setCheckingStatus(false);
     }
-  };
+  }, [router, fetchDashboardStats]);
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    } else if (status === 'authenticated') {
+      // Check if onboarding is complete
+      checkOnboardingStatus();
+    }
+  }, [status, router, checkOnboardingStatus]);
 
   const loadMoreActivity = () => {
     setActivityLimit(prev => prev + 5);
@@ -122,7 +122,7 @@ export default function Dashboard() {
     if (recentActivity.length > 0) {
       fetchRecentActivity();
     }
-  }, [activityLimit]);
+  }, [activityLimit, recentActivity.length, fetchRecentActivity]);
 
   if (status === 'loading' || checkingStatus) {
     return (

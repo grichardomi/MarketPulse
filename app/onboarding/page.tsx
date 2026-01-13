@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -53,16 +53,7 @@ export default function OnboardingPage() {
     timezone: 'America/New_York',
   });
 
-  // Check auth status and onboarding completion
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/onboarding');
-    } else if (status === 'authenticated') {
-      checkOnboardingStatus();
-    }
-  }, [status, router]);
-
-  const checkOnboardingStatus = async () => {
+  const checkOnboardingStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/onboarding/status');
       const data = await res.json();
@@ -83,7 +74,16 @@ export default function OnboardingPage() {
       console.error('Failed to check onboarding status:', err);
       setCheckingStatus(false);
     }
-  };
+  }, [router]);
+
+  // Check auth status and onboarding completion
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin?callbackUrl=/onboarding');
+    } else if (status === 'authenticated') {
+      checkOnboardingStatus();
+    }
+  }, [status, router, checkOnboardingStatus]);
 
   // Business step handler
   const handleBusinessSubmit = async () => {

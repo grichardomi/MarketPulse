@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { getPasswordStrength } from '@/lib/auth/password';
+import { getPasswordStrength, validatePasswordStrength } from '@/lib/auth/password';
 
 function ResetPasswordContent() {
   const router = useRouter();
@@ -20,6 +20,7 @@ function ResetPasswordContent() {
   const [success, setSuccess] = useState(false);
 
   const passwordStrength = getPasswordStrength(password);
+  const passwordValidation = validatePasswordStrength(password);
 
   useEffect(() => {
     if (!token) {
@@ -191,9 +192,9 @@ function ResetPasswordContent() {
                       {getStrengthText(passwordStrength.score)}
                     </span>
                   </div>
-                  {passwordStrength.feedback.length > 0 && (
+                  {passwordValidation.errors.length > 0 && (
                     <p className="text-xs text-gray-500 mt-1">
-                      {passwordStrength.feedback[0]}
+                      {passwordValidation.errors[0]}
                     </p>
                   )}
                 </div>

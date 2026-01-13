@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 
 interface Competitor {
@@ -35,14 +35,7 @@ export default function EditCompetitorPage() {
     router.push('/auth/signin');
   }
 
-  // Load competitor data
-  useEffect(() => {
-    if (status === 'authenticated' && id) {
-      loadCompetitor();
-    }
-  }, [status, id]);
-
-  const loadCompetitor = async () => {
+  const loadCompetitor = useCallback(async () => {
     if (!id) return;
 
     try {
@@ -72,7 +65,14 @@ export default function EditCompetitorPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, router]);
+
+  // Load competitor data
+  useEffect(() => {
+    if (status === 'authenticated' && id) {
+      loadCompetitor();
+    }
+  }, [status, id, loadCompetitor]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

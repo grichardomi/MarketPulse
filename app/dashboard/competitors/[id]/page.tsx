@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   formatRelativeTime,
@@ -48,14 +48,7 @@ export default function CompetitorDetailPage() {
     router.push('/auth/signin');
   }
 
-  // Load competitor data
-  useEffect(() => {
-    if (status === 'authenticated' && id) {
-      loadCompetitorData();
-    }
-  }, [status, id]);
-
-  const loadCompetitorData = async () => {
+  const loadCompetitorData = useCallback(async () => {
     if (!id) return;
 
     try {
@@ -79,7 +72,14 @@ export default function CompetitorDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, router]);
+
+  // Load competitor data
+  useEffect(() => {
+    if (status === 'authenticated' && id) {
+      loadCompetitorData();
+    }
+  }, [status, id, loadCompetitorData]);
 
   if (status === 'loading' || loading) {
     return (

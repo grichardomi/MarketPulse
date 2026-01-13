@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';
 import { formatRelativeTime } from '@/lib/utils/format';
 
@@ -77,26 +77,7 @@ function AlertsContent() {
     router.push('/auth/signin');
   }
 
-  // Load alerts
-  useEffect(() => {
-    if (status === 'authenticated') {
-      loadAlerts();
-    }
-  }, [status, alertType, isRead, competitorId, dateFrom, dateTo, sortBy, sortOrder]);
-
-  // Reset display limit when filters change
-  useEffect(() => {
-    setDisplayLimit(20);
-  }, [alertType, isRead, competitorId, dateFrom, dateTo, sortBy, sortOrder]);
-
-  // Reload when display limit changes
-  useEffect(() => {
-    if (status === 'authenticated' && displayLimit > 20) {
-      loadAlerts();
-    }
-  }, [displayLimit]);
-
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -128,7 +109,26 @@ function AlertsContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [displayLimit, alertType, isRead, competitorId, dateFrom, dateTo, sortBy, sortOrder]);
+
+  // Load alerts
+  useEffect(() => {
+    if (status === 'authenticated') {
+      loadAlerts();
+    }
+  }, [status, loadAlerts]);
+
+  // Reset display limit when filters change
+  useEffect(() => {
+    setDisplayLimit(20);
+  }, [alertType, isRead, competitorId, dateFrom, dateTo, sortBy, sortOrder]);
+
+  // Reload when display limit changes
+  useEffect(() => {
+    if (status === 'authenticated' && displayLimit > 20) {
+      loadAlerts();
+    }
+  }, [status, displayLimit, loadAlerts]);
 
   const handleSelectAlert = (alertId: number) => {
     const newSet = new Set(selectedAlerts);

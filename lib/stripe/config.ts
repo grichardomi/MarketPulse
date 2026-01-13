@@ -16,7 +16,10 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 export { PRICING_PLANS };
 
 // Helper to get price ID based on plan
-export function getPriceId(plan: keyof typeof PRICING_PLANS): string {
+export function getPriceId(
+  plan: keyof typeof PRICING_PLANS,
+  _billingCycle: 'monthly' | 'annual' = 'monthly'
+): string {
   return PRICING_PLANS[plan].priceId;
 }
 
