@@ -39,16 +39,6 @@ export default function SupportTicketDetailPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    }
-
-    if (status === 'authenticated' && params.id) {
-      loadTicket();
-    }
-  }, [status, params.id, router]);
-
   const loadTicket = async () => {
     try {
       setLoading(true);
@@ -71,6 +61,17 @@ export default function SupportTicketDetailPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+
+    if (status === 'authenticated' && params.id) {
+      loadTicket();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, params.id]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
