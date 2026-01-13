@@ -39,16 +39,6 @@ export default function AdminSupportPage() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin');
-    }
-
-    if (status === 'authenticated') {
-      loadTickets();
-    }
-  }, [status, router, filterStatus, filterPriority]);
-
   const loadTickets = async () => {
     try {
       setLoading(true);
@@ -75,6 +65,17 @@ export default function AdminSupportPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+    }
+
+    if (status === 'authenticated') {
+      loadTickets();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, filterStatus, filterPriority]);
 
   if (status === 'loading' || loading) {
     return (
