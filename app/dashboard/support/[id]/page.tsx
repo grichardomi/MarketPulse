@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatRelativeTime } from '@/lib/utils/format';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface Message {
   id: number;
@@ -38,6 +39,8 @@ export default function SupportTicketDetailPage() {
   const [error, setError] = useState('');
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [closingTicket, setClosingTicket] = useState(false);
 
   const loadTicket = async () => {
     try {
@@ -101,10 +104,13 @@ export default function SupportTicketDetailPage() {
     }
   };
 
-  const handleCloseTicket = async () => {
-    if (!confirm('Are you sure you want to close this ticket?')) {
-      return;
-    }
+  const handleCloseTicket = () => {
+    setShowCloseConfirm(true);
+  };
+
+  const confirmCloseTicket = async () => {
+    setClosingTicket(true);
+    setError('');
 
     try {
       const res = await fetch(`/api/support/tickets/${params.id}`, {
@@ -117,10 +123,13 @@ export default function SupportTicketDetailPage() {
         throw new Error('Failed to close ticket');
       }
 
+      setShowCloseConfirm(false);
       await loadTicket();
     } catch (err) {
       console.error('Failed to close ticket:', err);
       setError('Failed to close ticket');
+    } finally {
+      setClosingTicket(false);
     }
   };
 
@@ -304,6 +313,18 @@ export default function SupportTicketDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showCloseConfirm}
+        onClose={() => setShowCloseConfirm(false)}
+        onConfirm={confirmCloseTicket}
+        title="Close Ticket"
+        message="Are you sure you want to close this ticket? You won't be able to add more messages once it's closed."
+        confirmText="Close Ticket"
+        confirmButtonClass="bg-red-600 hover:bg-red-700"
+        isLoading={closingTicket}
+      />
     </main>
   );
 }

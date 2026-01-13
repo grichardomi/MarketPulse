@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface User {
   id: string;
@@ -48,6 +49,17 @@ export default function SubscriptionDetailsPage() {
   const [error, setError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    action: 'pause' | 'resume' | '';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: '',
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -89,45 +101,54 @@ export default function SubscriptionDetailsPage() {
     fetchData();
   }, [subscriptionId]);
 
-  const handlePause = async () => {
-    if (!subscription || !confirm('Are you sure you want to pause this subscription?')) return;
-
-    setActionLoading(true);
-    try {
-      const res = await fetch('/api/admin/subscriptions/pause', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subscriptionId: subscription.id }),
-      });
-
-      if (!res.ok) throw new Error('Failed to pause');
-
-      setMessage({ type: 'success', text: 'Subscription paused successfully' });
-      window.location.reload();
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to pause subscription' });
-    } finally {
-      setActionLoading(false);
-    }
+  const handlePause = () => {
+    if (!subscription) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Pause Subscription',
+      message: 'Are you sure you want to pause this subscription? The customer will lose access to premium features.',
+      action: 'pause',
+    });
   };
 
-  const handleResume = async () => {
-    if (!subscription || !confirm('Are you sure you want to resume this subscription?')) return;
+  const handleResume = () => {
+    if (!subscription) return;
+    setConfirmModal({
+      isOpen: true,
+      title: 'Resume Subscription',
+      message: 'Are you sure you want to resume this subscription? The customer will regain access to premium features.',
+      action: 'resume',
+    });
+  };
+
+  const confirmAction = async () => {
+    if (!subscription) return;
 
     setActionLoading(true);
     try {
-      const res = await fetch('/api/admin/subscriptions/resume', {
+      const endpoint = confirmModal.action === 'pause'
+        ? '/api/admin/subscriptions/pause'
+        : '/api/admin/subscriptions/resume';
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subscriptionId: subscription.id }),
       });
 
-      if (!res.ok) throw new Error('Failed to resume');
+      if (!res.ok) throw new Error(`Failed to ${confirmModal.action}`);
 
-      setMessage({ type: 'success', text: 'Subscription resumed successfully' });
+      setMessage({
+        type: 'success',
+        text: `Subscription ${confirmModal.action}d successfully`
+      });
+      setConfirmModal({ isOpen: false, title: '', message: '', action: '' });
       window.location.reload();
     } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to resume subscription' });
+      setMessage({
+        type: 'error',
+        text: `Failed to ${confirmModal.action} subscription`
+      });
     } finally {
       setActionLoading(false);
     }
@@ -378,6 +399,18 @@ export default function SubscriptionDetailsPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: '', message: '', action: '' })}
+        onConfirm={confirmAction}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.action === 'pause' ? 'Pause Subscription' : 'Resume Subscription'}
+        confirmButtonClass={confirmModal.action === 'pause' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}
+        isLoading={actionLoading}
+      />
     </div>
   );
 }

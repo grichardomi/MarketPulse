@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatRelativeTime } from '@/lib/utils/format';
 import { getPricingPlanByPriceId } from '@/lib/config/pricing';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface Message {
   id: number;
@@ -53,6 +54,17 @@ export default function AdminSupportTicketDetailPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    action: string;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: '',
+  });
 
   const loadTicket = async () => {
     try {
@@ -123,11 +135,17 @@ export default function AdminSupportTicketDetailPage() {
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!confirm(`Change ticket status to "${newStatus}"?`)) {
-      return;
-    }
+  const handleStatusChange = (newStatus: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Change Ticket Status',
+      message: `Are you sure you want to change this ticket status to "${newStatus.replace('_', ' ')}"?`,
+      action: newStatus,
+    });
+  };
 
+  const confirmStatusChange = async () => {
+    const newStatus = confirmModal.action;
     setUpdatingStatus(true);
     setError('');
 
@@ -142,6 +160,7 @@ export default function AdminSupportTicketDetailPage() {
         throw new Error('Failed to update status');
       }
 
+      setConfirmModal({ isOpen: false, title: '', message: '', action: '' });
       await loadTicket();
     } catch (err) {
       console.error('Failed to update status:', err);
@@ -440,6 +459,18 @@ export default function AdminSupportTicketDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: '', message: '', action: '' })}
+        onConfirm={confirmStatusChange}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Change Status"
+        confirmButtonClass="bg-yellow-600 hover:bg-yellow-700"
+        isLoading={updatingStatus}
+      />
     </main>
   );
 }
