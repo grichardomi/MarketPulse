@@ -1,0 +1,197 @@
+'use client';
+
+import Link from 'next/link';
+import Image from 'next/image';
+import { useSession } from 'next-auth/react';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Footer from '@/components/Footer';
+import { getAllPricingPlans } from '@/lib/config/pricing';
+
+export default function Pricing() {
+  const { status } = useSession();
+  const router = useRouter();
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState('');
+
+  // Get plans from centralized pricing config
+  const plans = getAllPricingPlans().map(plan => ({
+    id: plan.id,
+    name: plan.name,
+    price: plan.price / 100, // Convert cents to dollars
+    competitors: plan.competitorLimit,
+    features: plan.features,
+    highlighted: plan.highlighted,
+  }));
+
+  const handleGetStarted = async (planId: string) => {
+    // If not authenticated, redirect to signin
+    if (status === 'unauthenticated') {
+      router.push('/auth/signin');
+      return;
+    }
+
+    // If loading, wait
+    if (status === 'loading') {
+      return;
+    }
+
+    try {
+      setLoading(planId);
+      setError('');
+
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId, billingCycle: 'monthly' }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create checkout session');
+      }
+
+      // Redirect to Stripe checkout
+      window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      setError(err.message || 'Failed to start checkout');
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-2 md:py-3 lg:py-4">
+        <div className="container mx-auto flex items-center justify-between">
+          <Link href="/">
+            <Image
+              src="/logo_transparent.png"
+              alt="MarketPulse"
+              width={500}
+              height={125}
+              className="h-16 md:h-16 lg:h-20 xl:h-24 w-auto"
+              priority
+            />
+          </Link>
+          <div className="flex items-center gap-4">
+            {status === 'authenticated' ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="px-4 py-2 text-gray-600 hover:text-gray-900"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dashboard/billing"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  My Account
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/auth/signin"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Pricing Section */}
+      <main className="container mx-auto px-4 sm:px-6 py-16">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-lg text-gray-600">
+            Choose the plan that fits your business needs
+          </p>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Pricing Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {plans.map(plan => (
+            <div
+              key={plan.name}
+              className={`rounded-lg border p-8 transition-all ${
+                plan.highlighted
+                  ? 'bg-blue-50 border-blue-300 shadow-lg scale-105'
+                  : 'bg-white border-gray-200'
+              }`}
+            >
+              {/* Badge */}
+              {plan.highlighted && (
+                <div className="inline-block px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded-full mb-4">
+                  Most Popular
+                </div>
+              )}
+
+              {/* Plan Name */}
+              <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
+              <p className="text-gray-600 mb-6">Up to {plan.competitors} competitors</p>
+
+              {/* Price */}
+              <div className="mb-6">
+                <span className="text-5xl font-bold">${plan.price}</span>
+                <span className="text-gray-600">/month</span>
+              </div>
+
+              {/* CTA Button */}
+              <button
+                onClick={() => handleGetStarted(plan.id)}
+                disabled={loading !== null}
+                className={`w-full px-4 py-2 rounded-lg font-semibold transition-colors mb-8 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  plan.highlighted
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                }`}
+              >
+                {loading === plan.id ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    Loading...
+                  </span>
+                ) : (
+                  'Get Started'
+                )}
+              </button>
+
+              {/* Features List */}
+              <ul className="space-y-4">
+                {plan.features.map((feature, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <span className="text-green-600 font-bold mt-1">✓</span>
+                    <span className="text-gray-700">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        {/* Trial Info */}
+        <div className="mt-16 text-center">
+          <p className="text-lg text-gray-600">
+            All plans include a <span className="font-semibold">14-day free trial</span> with full
+            features
+          </p>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
