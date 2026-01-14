@@ -5,6 +5,8 @@ import TrialDay7Reminder from '@/emails/trial-day7-reminder';
 import TrialDay11Reminder from '@/emails/trial-day11-reminder';
 import TrialEnded from '@/emails/trial-ended';
 import GracePeriodEnded from '@/emails/grace-period-ended';
+import EmailChangeVerification from '@/emails/email-change-verification';
+import EmailChangeNotification from '@/emails/email-change-notification';
 
 interface RenderEmailParams {
   templateName: string;
@@ -33,6 +35,8 @@ export async function renderEmailTemplate({
       trial_day11_reminder: TrialDay11Reminder,
       trial_ended: TrialEnded,
       grace_period_ended: GracePeriodEnded,
+      'email-change-verification': EmailChangeVerification,
+      'email-change-notification': EmailChangeNotification,
     };
 
     const TemplateComponent = templates[templateName];
@@ -81,6 +85,8 @@ export function generateSubject(alertType: string, competitorName?: string): str
     trial_day11_reminder: 'Your trial ends in 3 days',
     trial_ended: 'Your trial has ended',
     grace_period_ended: 'Your MarketPulse access has expired',
+    'email-change-verification': 'Verify your new email address',
+    'email-change-notification': '🔔 Security Alert: Email change requested',
   };
 
   return subjects[alertType] || (competitorName ? `Update at ${competitorName}` : 'MarketPulse Update');

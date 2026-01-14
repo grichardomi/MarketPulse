@@ -36,12 +36,17 @@ export async function GET() {
     const business = user.Business[0];
 
     return Response.json({
-      id: business.id,
-      name: business.name,
-      location: business.location,
-      industry: business.industry,
-      createdAt: business.createdAt,
-      updatedAt: business.updatedAt,
+      business: {
+        id: business.id,
+        name: business.name,
+        location: business.location,
+        industry: business.industry,
+        city: business.city,
+        state: business.state,
+        zipcode: business.zipcode,
+        createdAt: business.createdAt,
+        updatedAt: business.updatedAt,
+      },
     });
   } catch (error) {
     console.error('Failed to fetch business:', error);

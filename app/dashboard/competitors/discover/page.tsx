@@ -188,9 +188,9 @@ export default function DiscoverCompetitorsPage() {
               onComplete={handleDiscoveryComplete}
               onSkip={handleSkip}
               initialIndustry={businessData?.industry || ''}
-              initialCity={businessData?.location ? parseLocation(businessData.location).city : ''}
-              initialState={businessData?.location ? parseLocation(businessData.location).state : ''}
-              initialZipcode={businessData?.location ? parseLocation(businessData.location).zipcode : ''}
+              initialCity={businessData?.city || (businessData?.location ? parseLocation(businessData.location).city : '')}
+              initialState={businessData?.state || (businessData?.location ? parseLocation(businessData.location).state : '')}
+              initialZipcode={businessData?.zipcode || (businessData?.location ? parseLocation(businessData.location).zipcode : '')}
               maxSelectable={Math.max(0, competitorLimit - currentCount)}
             />
           )}

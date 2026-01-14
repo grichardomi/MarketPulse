@@ -53,12 +53,12 @@ export default function BusinessSettingsPage() {
       const res = await fetch('/api/business');
       if (!res.ok) throw new Error('Failed to load business');
 
-      const data: Business = await res.json();
-      setBusiness(data);
+      const data = await res.json();
+      setBusiness(data.business);
 
       // Update form state
-      setName(data.name);
-      setLocation(data.location);
+      setName(data.business.name);
+      setLocation(data.business.location);
       setError('');
       setHasChanges(false);
     } catch (err) {

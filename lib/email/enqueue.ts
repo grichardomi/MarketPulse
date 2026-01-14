@@ -78,6 +78,42 @@ export async function enqueueEmail({
 }
 
 /**
+ * Enqueue a system email (bypasses notification preferences)
+ * Use for critical emails like password reset, email verification, etc.
+ */
+export async function enqueueSystemEmail(
+  userId: number,
+  toEmail: string,
+  templateName: string,
+  templateData: any
+): Promise<{ success: boolean; queueId?: string; reason?: string }> {
+  try {
+    // Insert into EmailQueue immediately (no quiet hours check)
+    const queueEntry = await db.emailQueue.create({
+      data: {
+        userId,
+        toEmail,
+        templateName,
+        templateData,
+        scheduledFor: new Date(), // Send immediately
+        status: 'pending',
+      },
+    });
+
+    return {
+      success: true,
+      queueId: String(queueEntry.id),
+    };
+  } catch (error) {
+    console.error('Failed to enqueue system email:', error);
+    return {
+      success: false,
+      reason: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Convenience function to enqueue email for an alert
  */
 export async function enqueueAlertEmail(alertId: number): Promise<{ success: boolean; reason?: string }> {

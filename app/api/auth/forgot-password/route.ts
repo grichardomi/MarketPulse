@@ -27,13 +27,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Check if user has a password (they might be OAuth-only)
-    if (!user.password) {
-      return NextResponse.json({
-        success: true,
-        message: 'If an account exists with that email, a reset link has been sent.',
-      });
-    }
+    // Note: We allow password reset/set for ALL users, including OAuth-only users
+    // This enables OAuth users to add email/password login capability
+    // and recovers users who changed their email away from their OAuth provider
 
     // Generate password reset token
     const resetToken = crypto.randomBytes(32).toString('hex');

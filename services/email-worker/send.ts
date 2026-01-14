@@ -80,7 +80,7 @@ export async function sendQueuedEmail(emailQueueId: number): Promise<{
 
     // Generate subject line
     const templateData = queueEntry.templateData as any;
-    const alertType = templateData?.alertType || 'update';
+    const alertType = templateData?.alertType || queueEntry.templateName;
     const competitorName = templateData?.competitorName || 'Competitor';
     const subject = generateSubject(alertType, competitorName);
 
@@ -88,7 +88,7 @@ export async function sendQueuedEmail(emailQueueId: number): Promise<{
     let emailResult: { success: boolean; error?: string } | null = null;
     try {
       await sendEmail({
-        from: 'alerts@marketpulse.com',
+        from: process.env.EMAIL_FROM || 'onboarding@resend.dev',
         to: queueEntry.toEmail,
         subject,
         html: renderResult.html,

@@ -259,6 +259,11 @@ model User {
   passwordResetExpires    DateTime?
   passwordResetToken      String?                  @unique
 
+  // Email change verification
+  pendingEmail            String?
+  pendingEmailToken       String?                  @unique
+  pendingEmailExpires     DateTime?
+
   // Business/Location info (for competitor discovery)
   industry                String?                  // e.g., "Pizza Restaurant", "Coffee Shop"
   city                    String?                  // e.g., "Austin"
