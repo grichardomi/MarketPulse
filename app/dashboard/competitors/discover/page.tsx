@@ -10,6 +10,7 @@ export default function DiscoverCompetitorsPage() {
   const [error, setError] = useState('');
   const [addedCompetitors, setAddedCompetitors] = useState<any[]>([]);
   const [businessData, setBusinessData] = useState<any>(null);
+  const [userData, setUserData] = useState<{ city?: string; state?: string } | null>(null);
   const [loadingBusiness, setLoadingBusiness] = useState(true);
   const [competitorLimit, setCompetitorLimit] = useState<number>(3);
   const [currentCount, setCurrentCount] = useState<number>(0);
@@ -20,9 +21,10 @@ export default function DiscoverCompetitorsPage() {
 
   const loadBusinessData = async () => {
     try {
-      const [businessRes, limitRes] = await Promise.all([
+      const [businessRes, limitRes, userRes] = await Promise.all([
         fetch('/api/business'),
         fetch('/api/subscription/limit'),
+        fetch('/api/user/profile'),
       ]);
 
       if (businessRes.ok) {
@@ -34,6 +36,14 @@ export default function DiscoverCompetitorsPage() {
         const limitData = await limitRes.json();
         setCompetitorLimit(limitData.competitorLimit || 3);
         setCurrentCount(limitData.currentCount || 0);
+      }
+
+      if (userRes.ok) {
+        const userProfile = await userRes.json();
+        setUserData({
+          city: userProfile.city || undefined,
+          state: userProfile.state || undefined,
+        });
       }
     } catch (err) {
       console.error('Failed to load business data:', err);
@@ -192,6 +202,8 @@ export default function DiscoverCompetitorsPage() {
               initialState={businessData?.state || (businessData?.location ? parseLocation(businessData.location).state : '')}
               initialZipcode={businessData?.zipcode || (businessData?.location ? parseLocation(businessData.location).zipcode : '')}
               maxSelectable={Math.max(0, competitorLimit - currentCount)}
+              userCity={userData?.city}
+              userState={userData?.state}
             />
           )}
         </div>

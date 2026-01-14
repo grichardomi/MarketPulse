@@ -60,6 +60,7 @@ function AlertsContent() {
   const [filterData, setFilterData] = useState<AlertsResponse['filters'] | null>(null);
   const [total, setTotal] = useState(0);
   const [selectedAlerts, setSelectedAlerts] = useState<Set<number>>(new Set());
+  const [undoAction, setUndoAction] = useState<{ alertIds: number[]; previousState: boolean } | null>(null);
 
   // Filters
   const [alertType, setAlertType] = useState(searchParams.get('alertType') || 'all');
@@ -148,26 +149,73 @@ function AlertsContent() {
     }
   };
 
-  const handleMarkAsRead = async () => {
+  const handleMarkAsRead = async (markAsRead: boolean = true) => {
     if (selectedAlerts.size === 0) return;
+
+    const alertIds = Array.from(selectedAlerts);
+
+    // Optimistic UI update - update local state immediately
+    setAlerts(prev => prev.map(alert =>
+      alertIds.includes(alert.id) ? { ...alert, isRead: markAsRead } : alert
+    ));
+
+    // Store for undo
+    setUndoAction({ alertIds, previousState: !markAsRead });
+
+    // Clear selection
+    setSelectedAlerts(new Set());
+
+    // Auto-hide undo after 5 seconds
+    setTimeout(() => setUndoAction(null), 5000);
 
     try {
       const res = await fetch('/api/alerts', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          alertIds: Array.from(selectedAlerts),
-          isRead: true,
+          alertIds,
+          isRead: markAsRead,
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to update alerts');
-
-      setSelectedAlerts(new Set());
-      loadAlerts();
+      if (!res.ok) {
+        // Revert on failure
+        setAlerts(prev => prev.map(alert =>
+          alertIds.includes(alert.id) ? { ...alert, isRead: !markAsRead } : alert
+        ));
+        throw new Error('Failed to update alerts');
+      }
     } catch (err) {
       console.error('Failed to update alerts:', err);
       setError('Failed to update alerts');
+      setUndoAction(null);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!undoAction) return;
+
+    const { alertIds, previousState } = undoAction;
+
+    // Optimistic UI update
+    setAlerts(prev => prev.map(alert =>
+      alertIds.includes(alert.id) ? { ...alert, isRead: previousState } : alert
+    ));
+
+    setUndoAction(null);
+
+    try {
+      await fetch('/api/alerts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alertIds,
+          isRead: previousState,
+        }),
+      });
+    } catch (err) {
+      console.error('Failed to undo:', err);
+      loadAlerts(); // Reload to get correct state
     }
   };
 
@@ -345,6 +393,21 @@ function AlertsContent() {
           </div>
         </div>
 
+        {/* Undo Toast */}
+        {undoAction && (
+          <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-3 bg-gray-900 text-white rounded-lg shadow-lg flex items-center gap-4 animate-in slide-in-from-bottom-4">
+            <span className="text-sm">
+              {undoAction.alertIds.length} alert{undoAction.alertIds.length !== 1 ? 's' : ''} marked as {undoAction.previousState ? 'unread' : 'read'}
+            </span>
+            <button
+              onClick={handleUndo}
+              className="px-3 py-1 bg-white text-gray-900 rounded font-medium text-sm hover:bg-gray-100 transition-colors"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
         {/* Bulk Actions */}
         {selectedAlerts.size > 0 && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
@@ -353,12 +416,20 @@ function AlertsContent() {
                 {selectedAlerts.size} alert{selectedAlerts.size !== 1 ? 's' : ''} selected
               </p>
             </div>
-            <button
-              onClick={handleMarkAsRead}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-            >
-              Mark as Read
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleMarkAsRead(false)}
+                className="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+              >
+                Mark as Unread
+              </button>
+              <button
+                onClick={() => handleMarkAsRead(true)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Mark as Read
+              </button>
+            </div>
           </div>
         )}
 

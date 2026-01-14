@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState, useCallback } from 'react';
 
 interface Subscription {
   status: string;
@@ -16,8 +17,38 @@ interface HeaderProps {
 }
 
 export default function Header({ subscription }: HeaderProps) {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/alerts?limit=1&isRead=false');
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.total || 0);
+      }
+    } catch (err) {
+      console.error('Failed to fetch unread count:', err);
+    }
+  }, []);
+
+  // Fetch unread count on mount and periodically
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+
+    fetchUnreadCount();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, [status, fetchUnreadCount]);
+
+  // Refresh when navigating away from alerts page
+  useEffect(() => {
+    if (status === 'authenticated' && !pathname?.startsWith('/dashboard/alerts')) {
+      fetchUnreadCount();
+    }
+  }, [pathname, status, fetchUnreadCount]);
 
   const navItems = [
     { label: 'Dashboard', href: '/dashboard', icon: '📊' },
@@ -72,16 +103,63 @@ export default function Header({ subscription }: HeaderProps) {
 
             {/* User Menu */}
             <div className="relative flex items-center gap-2 sm:gap-4">
+              {/* Notification Bell */}
+              <Link
+                href="/dashboard/alerts"
+                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                title={unreadCount > 0 ? `${unreadCount} unread alerts` : 'Alerts'}
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+
+              {/* Plan Badge - Prominent display */}
+              {subscription?.status === 'trialing' && (
+                <Link
+                  href="/dashboard/billing"
+                  className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-full text-xs sm:text-sm font-semibold border border-amber-200 hover:bg-amber-200 transition-colors flex items-center gap-1.5"
+                >
+                  <span className="hidden sm:inline">On Trial</span>
+                  <span className="sm:hidden">Trial</span>
+                  {subscription.daysRemaining !== null && (
+                    <span className="bg-amber-800 text-amber-100 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+                      {subscription.daysRemaining}d left
+                    </span>
+                  )}
+                </Link>
+              )}
+              {subscription?.status === 'active' && (
+                <span className="px-3 py-1.5 bg-green-100 text-green-800 rounded-full text-xs sm:text-sm font-semibold border border-green-200">
+                  Pro
+                </span>
+              )}
+              {subscription?.status === 'past_due' && (
+                <Link
+                  href="/dashboard/billing"
+                  className="px-3 py-1.5 bg-red-100 text-red-800 rounded-full text-xs sm:text-sm font-semibold border border-red-200 hover:bg-red-200 transition-colors animate-pulse"
+                >
+                  Past Due
+                </Link>
+              )}
+              {!subscription && (
+                <Link
+                  href="/dashboard/billing"
+                  className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-xs sm:text-sm font-semibold border border-gray-200 hover:bg-gray-200 transition-colors"
+                >
+                  Free
+                </Link>
+              )}
+
               {/* User Info (Hidden on small mobile) */}
               <div className="text-right hidden sm:block">
                 <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[120px] sm:max-w-none">
                   {session?.user?.name || session?.user?.email}
-                </p>
-                <p className="text-xs text-gray-600">
-                  {subscription?.status === 'trialing' && 'On Trial'}
-                  {subscription?.status === 'active' && 'Active'}
-                  {subscription?.status === 'past_due' && 'Past Due'}
-                  {!subscription && 'Free'}
                 </p>
               </div>
 
@@ -132,13 +210,20 @@ export default function Header({ subscription }: HeaderProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex flex-col items-center py-2 px-2 text-[10px] sm:text-xs font-medium transition-colors ${
+              className={`relative flex flex-col items-center py-2 px-2 text-[10px] sm:text-xs font-medium transition-colors ${
                 isActive(item.href)
                   ? 'text-blue-600'
                   : 'text-gray-600 hover:text-blue-600'
               }`}
             >
-              <span className="text-base sm:text-lg mb-0.5">{item.icon}</span>
+              <span className="relative text-base sm:text-lg mb-0.5">
+                {item.icon}
+                {item.href === '/dashboard/alerts' && unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-2 flex items-center justify-center min-w-[16px] h-4 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
               <span className="truncate max-w-[60px]">{item.label}</span>
             </Link>
           ))}

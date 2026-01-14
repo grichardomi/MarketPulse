@@ -18,6 +18,8 @@ interface CompetitorDiscoveryProps {
   initialState?: string;
   initialZipcode?: string;
   maxSelectable?: number;
+  userCity?: string;
+  userState?: string;
 }
 
 export default function CompetitorDiscovery({
@@ -28,6 +30,8 @@ export default function CompetitorDiscovery({
   initialState = '',
   initialZipcode = '',
   maxSelectable = 999,
+  userCity = '',
+  userState = '',
 }: CompetitorDiscoveryProps) {
   // Form state
   const [industry, setIndustry] = useState(initialIndustry);
@@ -35,6 +39,18 @@ export default function CompetitorDiscovery({
   const [city, setCity] = useState(initialCity);
   const [state, setState] = useState(initialState);
   const [zipcode, setZipcode] = useState(initialZipcode);
+
+  // Validation helpers
+  const effectiveIndustry = industry === 'Other' ? customIndustry.trim() : industry.trim();
+  const isIndustryValid = effectiveIndustry.length > 0;
+  const isCityValid = city.trim().length > 0;
+  const isStateValid = state.length === 2;
+  const isFormValid = isIndustryValid && isCityValid && isStateValid;
+
+  // Check if location differs from user profile
+  const locationMismatch =
+    (userCity && userState) &&
+    (city.trim().toLowerCase() !== userCity.toLowerCase() || state !== userState);
 
   // Discovery state
   const [loading, setLoading] = useState(false);
@@ -290,11 +306,67 @@ export default function CompetitorDiscovery({
               </p>
             </div>
 
+            {/* Location Mismatch Warning */}
+            {locationMismatch && city && state && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">
+                      Location differs from your profile
+                    </p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Your profile shows <strong>{userCity}, {userState}</strong>.
+                      You&apos;re searching in <strong>{city}, {state}</strong>.
+                    </p>
+                    <p className="text-xs text-amber-600 mt-2">
+                      This is fine if you want to monitor competitors in a different area.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Validation Summary */}
+            {!isFormValid && !loading && (
+              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <p className="text-sm font-medium text-gray-700 mb-2">Required fields:</p>
+                <ul className="text-sm space-y-1">
+                  <li className={`flex items-center gap-2 ${isIndustryValid ? 'text-green-600' : 'text-gray-500'}`}>
+                    {isIndustryValid ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                    )}
+                    Industry / Business Type
+                  </li>
+                  <li className={`flex items-center gap-2 ${isCityValid ? 'text-green-600' : 'text-gray-500'}`}>
+                    {isCityValid ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                    )}
+                    City
+                  </li>
+                  <li className={`flex items-center gap-2 ${isStateValid ? 'text-green-600' : 'text-gray-500'}`}>
+                    {isStateValid ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                    )}
+                    State
+                  </li>
+                </ul>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 pt-4">
               <button
                 onClick={handleDiscover}
-                disabled={loading || !industry.trim() || !city.trim() || !state || (industry === 'Other' && !customIndustry.trim())}
+                disabled={loading || !isFormValid}
                 className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors inline-flex items-center justify-center gap-2"
               >
                 {loading ? (

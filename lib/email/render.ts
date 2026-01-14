@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { render } from '@react-email/render';
 import AlertNotification from '@/emails/alert-notification';
 import WelcomeEmail from '@/emails/welcome-email';
@@ -49,7 +50,8 @@ export async function renderEmailTemplate({
     }
 
     // Render React component to HTML (await the Promise)
-    const html = await render(TemplateComponent(templateData));
+    const element = React.createElement(TemplateComponent, templateData);
+    const html = await render(element);
 
     // Ensure html is a string
     if (typeof html !== 'string') {
