@@ -12,7 +12,7 @@ export interface PricingTier {
   displayPrice: string; // formatted for display (e.g., "$20")
   competitorLimit: number;
   historyRetentionDays: number | null; // null means unlimited
-  supportTier: 'standard' | 'priority' | 'dedicated';
+  supportTier: 'none' | 'priority' | 'dedicated'; // none = no ticket support, priority = Pro, dedicated = Enterprise
   features: string[];
   highlighted?: boolean;
 }
@@ -47,7 +47,7 @@ export const PRICING_PLANS: Record<string, PricingTier> = {
     displayPrice: formatPrice(getEnvNumber('STRIPE_STARTER_PRICE', 2000)),
     competitorLimit: getEnvNumber('STRIPE_STARTER_LIMIT', 5),
     historyRetentionDays: 30,
-    supportTier: 'standard',
+    supportTier: 'none', // No ticket support - email only via website
     features: [
       '5 competitors',
       'Twice-daily tracking',
@@ -139,18 +139,41 @@ export function getHistoryRetentionDays(priceId: string): number | null {
 /**
  * Get support tier for a price ID
  */
-export function getSupportTier(priceId: string): 'standard' | 'priority' | 'dedicated' {
+export function getSupportTier(priceId: string): 'none' | 'priority' | 'dedicated' {
   const plan = getPricingPlanByPriceId(priceId);
-  return plan?.supportTier || 'standard';
+  return plan?.supportTier || 'none';
 }
 
 /**
  * Trial configuration
+ * Note: Trial users do NOT have access to support tickets - they must upgrade
  */
 export const TRIAL_CONFIG = {
   durationDays: getEnvNumber('TRIAL_DURATION_DAYS', 14),
   gracePeriodDays: getEnvNumber('TRIAL_GRACE_PERIOD_DAYS', 3),
   competitorLimit: getEnvNumber('TRIAL_COMPETITOR_LIMIT', 3),
   historyRetentionDays: 30, // Trial gets 30-day history
-  supportTier: 'standard' as const,
+  hasSupport: false, // Trial users cannot create support tickets
 };
+
+/**
+ * Check if a subscription has support ticket access
+ * Only Professional and Enterprise plans have support ticket access
+ * @param subscriptionStatus - The subscription status (active, trialing, etc.)
+ * @param stripePriceId - The Stripe price ID to determine the plan tier
+ */
+export function hasAccessToSupport(subscriptionStatus: string | null, stripePriceId?: string | null): boolean {
+  // Must have active subscription
+  if (subscriptionStatus !== 'active') {
+    return false;
+  }
+
+  // Must have a price ID to check plan
+  if (!stripePriceId) {
+    return false;
+  }
+
+  // Check if the plan has support access (priority or dedicated, not 'none')
+  const supportTier = getSupportTier(stripePriceId);
+  return supportTier === 'priority' || supportTier === 'dedicated';
+}

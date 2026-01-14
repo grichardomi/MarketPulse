@@ -26,6 +26,8 @@ export default function SupportPage() {
   const [loading, setLoading] = useState(true);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [error, setError] = useState('');
+  const [hasAccess, setHasAccess] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -47,7 +49,9 @@ export default function SupportPage() {
       }
 
       const data = await res.json();
-      setTickets(data.tickets);
+      setTickets(data.tickets || []);
+      setHasAccess(data.hasAccess !== false);
+      setSubscriptionStatus(data.subscriptionStatus || null);
     } catch (err) {
       console.error('Failed to load tickets:', err);
       setError('Failed to load support tickets');
@@ -100,6 +104,47 @@ export default function SupportPage() {
         return null;
     }
   };
+
+  // Show upgrade prompt for users without support access
+  if (!hasAccess) {
+    return (
+      <main className="container mx-auto px-4 sm:px-6 py-8">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">Support Tickets</h1>
+            <p className="text-gray-600 mb-6 max-w-md mx-auto">
+              {subscriptionStatus === 'trialing'
+                ? 'Support tickets are available on Professional and Enterprise plans. Upgrade to get priority help from our team.'
+                : subscriptionStatus === 'active'
+                  ? 'Support tickets are available on Professional and Enterprise plans. Upgrade your plan to access our support team.'
+                  : 'Upgrade to Professional or Enterprise to access our dedicated support team.'}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/dashboard/billing">
+                <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                  View Plans & Upgrade
+                </button>
+              </Link>
+              <a
+                href="mailto:support@marketpulse.com"
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+              >
+                Email Us Instead
+              </a>
+            </div>
+            <p className="text-sm text-gray-500 mt-6">
+              Need urgent help? Email us at support@marketpulse.com
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="container mx-auto px-4 sm:px-6 py-8">

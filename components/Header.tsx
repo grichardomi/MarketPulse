@@ -10,6 +10,8 @@ interface Subscription {
   status: string;
   daysRemaining: number | null;
   currentPeriodEnd: string;
+  stripePriceId?: string;
+  competitorLimit?: number;
 }
 
 interface HeaderProps {
@@ -50,14 +52,23 @@ export default function Header({ subscription }: HeaderProps) {
     }
   }, [pathname, status, fetchUnreadCount]);
 
-  const navItems = [
+  // Check if user has support access (Professional or Enterprise plans only)
+  // Professional = 15 competitors, Enterprise = 50 competitors
+  const hasSupportAccess = subscription?.status === 'active' &&
+    subscription?.competitorLimit !== undefined &&
+    subscription.competitorLimit >= 15;
+
+  const allNavItems = [
     { label: 'Dashboard', href: '/dashboard', icon: '📊' },
     { label: 'Competitors', href: '/dashboard/competitors', icon: '👥' },
     { label: 'Alerts', href: '/dashboard/alerts', icon: '🔔' },
-    { label: 'Support', href: '/dashboard/support', icon: '💬' },
+    { label: 'Support', href: '/dashboard/support', icon: '💬', requiresSupport: true },
     { label: 'Billing', href: '/dashboard/billing', icon: '💳' },
     { label: 'Settings', href: '/dashboard/settings', icon: '⚙️' },
   ];
+
+  // Filter out Support for users without support access (Trial, Starter)
+  const navItems = allNavItems.filter(item => !item.requiresSupport || hasSupportAccess);
 
   const isActive = (href: string) => {
     if (href === '/dashboard') {
@@ -123,15 +134,25 @@ export default function Header({ subscription }: HeaderProps) {
               {subscription?.status === 'trialing' && (
                 <Link
                   href="/dashboard/billing"
-                  className="px-3 py-1.5 bg-amber-100 text-amber-800 rounded-full text-xs sm:text-sm font-semibold border border-amber-200 hover:bg-amber-200 transition-colors flex items-center gap-1.5"
+                  className="hidden sm:flex items-center bg-amber-100 rounded-full border border-amber-200 hover:bg-amber-200 transition-colors overflow-hidden"
                 >
-                  <span className="hidden sm:inline">On Trial</span>
-                  <span className="sm:hidden">Trial</span>
+                  <span className="px-3 py-1.5 text-amber-800 text-sm font-semibold">
+                    On Trial
+                  </span>
                   {subscription.daysRemaining !== null && (
-                    <span className="bg-amber-800 text-amber-100 px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
+                    <span className="px-3 py-1.5 bg-amber-700 text-white text-sm font-bold flex items-center justify-center min-w-[60px]">
                       {subscription.daysRemaining}d left
                     </span>
                   )}
+                </Link>
+              )}
+              {/* Mobile Trial Badge */}
+              {subscription?.status === 'trialing' && (
+                <Link
+                  href="/dashboard/billing"
+                  className="sm:hidden px-2 py-1 bg-amber-700 text-white rounded-full text-xs font-bold"
+                >
+                  {subscription.daysRemaining !== null ? `${subscription.daysRemaining}d` : 'Trial'}
                 </Link>
               )}
               {subscription?.status === 'active' && (

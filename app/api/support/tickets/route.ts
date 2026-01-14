@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { db } from '@/lib/db/prisma';
-import { getSupportTier } from '@/lib/config/pricing';
+import { getSupportTier, hasAccessToSupport } from '@/lib/config/pricing';
 
 /**
  * GET /api/support/tickets
@@ -16,10 +16,32 @@ export async function GET() {
 
     const user = await db.user.findUnique({
       where: { email: session.user.email },
+      include: {
+        Subscription: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
     });
 
     if (!user) {
       return Response.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check subscription status for support access
+    const subscription = user.Subscription?.[0];
+    const subscriptionStatus = subscription?.status || null;
+    const stripePriceId = subscription?.stripePriceId || null;
+    const hasSupportAccess = hasAccessToSupport(subscriptionStatus, stripePriceId);
+
+    // Return subscription info along with tickets (for UI to show upgrade prompt)
+    if (!hasSupportAccess) {
+      return Response.json({
+        tickets: [],
+        hasAccess: false,
+        subscriptionStatus,
+        message: 'Support tickets are available on Professional and Enterprise plans. Please upgrade to access support.',
+      });
     }
 
     // Get all tickets for the user
@@ -37,7 +59,7 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     });
 
-    return Response.json({ tickets });
+    return Response.json({ tickets, hasAccess: true });
   } catch (error) {
     console.error('Failed to fetch support tickets:', error);
     return Response.json(
@@ -72,9 +94,22 @@ export async function POST(req: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Check if user has support access (Professional and Enterprise only)
+    const subscriptionStatus = subscription?.status || null;
+    const stripePriceId = subscription?.stripePriceId || null;
+    if (!hasAccessToSupport(subscriptionStatus, stripePriceId)) {
+      return Response.json(
+        {
+          error: 'SUPPORT_REQUIRES_PRO_PLAN',
+          message: 'Support tickets are available on Professional and Enterprise plans. Please upgrade to access support.',
+        },
+        { status: 403 }
+      );
+    }
+
     const supportTier = subscription
       ? getSupportTier(subscription.stripePriceId)
-      : 'standard';
+      : 'none';
 
     const body = await req.json();
     const { subject, description, category } = body;

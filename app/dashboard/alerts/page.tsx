@@ -4,7 +4,6 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';
-import { formatRelativeTime } from '@/lib/utils/format';
 
 interface Alert {
   id: number;
@@ -149,23 +148,60 @@ function AlertsContent() {
     }
   };
 
-  const handleMarkAsRead = async (markAsRead: boolean = true) => {
+  // Toggle read status for a single alert (inline action)
+  const handleToggleRead = async (alertId: number, currentIsRead: boolean) => {
+    const newIsRead = !currentIsRead;
+
+    // Optimistic UI update
+    setAlerts(prev => prev.map(alert =>
+      alert.id === alertId ? { ...alert, isRead: newIsRead } : alert
+    ));
+
+    // Store for undo
+    setUndoAction({ alertIds: [alertId], previousState: currentIsRead });
+    setTimeout(() => setUndoAction(null), 5000);
+
+    try {
+      const res = await fetch('/api/alerts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          alertIds: [alertId],
+          isRead: newIsRead,
+        }),
+      });
+
+      if (!res.ok) {
+        // Revert on failure
+        setAlerts(prev => prev.map(alert =>
+          alert.id === alertId ? { ...alert, isRead: currentIsRead } : alert
+        ));
+        throw new Error('Failed to update alert');
+      }
+    } catch (err) {
+      console.error('Failed to update alert:', err);
+      setError('Failed to update alert');
+      setUndoAction(null);
+    }
+  };
+
+  // Bulk mark as read/unread (for selected alerts)
+  const handleBulkMarkAsRead = async (markAsRead: boolean) => {
     if (selectedAlerts.size === 0) return;
 
     const alertIds = Array.from(selectedAlerts);
+    const previousStates = new Map(
+      alerts.filter(a => alertIds.includes(a.id)).map(a => [a.id, a.isRead])
+    );
 
-    // Optimistic UI update - update local state immediately
+    // Optimistic UI update
     setAlerts(prev => prev.map(alert =>
       alertIds.includes(alert.id) ? { ...alert, isRead: markAsRead } : alert
     ));
 
-    // Store for undo
+    // Store for undo (use the opposite of what we're setting)
     setUndoAction({ alertIds, previousState: !markAsRead });
-
-    // Clear selection
     setSelectedAlerts(new Set());
-
-    // Auto-hide undo after 5 seconds
     setTimeout(() => setUndoAction(null), 5000);
 
     try {
@@ -180,9 +216,10 @@ function AlertsContent() {
 
       if (!res.ok) {
         // Revert on failure
-        setAlerts(prev => prev.map(alert =>
-          alertIds.includes(alert.id) ? { ...alert, isRead: !markAsRead } : alert
-        ));
+        setAlerts(prev => prev.map(alert => {
+          const prevState = previousStates.get(alert.id);
+          return prevState !== undefined ? { ...alert, isRead: prevState } : alert;
+        }));
         throw new Error('Failed to update alerts');
       }
     } catch (err) {
@@ -215,7 +252,7 @@ function AlertsContent() {
       });
     } catch (err) {
       console.error('Failed to undo:', err);
-      loadAlerts(); // Reload to get correct state
+      loadAlerts();
     }
   };
 
@@ -408,31 +445,6 @@ function AlertsContent() {
           </div>
         )}
 
-        {/* Bulk Actions */}
-        {selectedAlerts.size > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-blue-900">
-                {selectedAlerts.size} alert{selectedAlerts.size !== 1 ? 's' : ''} selected
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleMarkAsRead(false)}
-                className="px-4 py-2 border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
-              >
-                Mark as Unread
-              </button>
-              <button
-                onClick={() => handleMarkAsRead(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Mark as Read
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Alerts List */}
         {alerts.length === 0 ? (
           <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
@@ -445,23 +457,52 @@ function AlertsContent() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* Header Row */}
-            <div className="hidden md:flex items-center gap-4 px-6 py-3 bg-gray-100 rounded-lg">
+          <div className="space-y-2">
+            {/* Header Row - Desktop */}
+            <div className="hidden md:grid md:grid-cols-[auto_1fr_180px_140px_140px_100px] items-center gap-4 px-4 py-3 bg-gray-100 rounded-lg">
               <input
                 type="checkbox"
                 checked={selectedAlerts.size === alerts.length && alerts.length > 0}
                 onChange={handleSelectAll}
                 className="w-4 h-4 text-blue-600 rounded"
+                title="Select all"
               />
-              <div className="flex-1">
+              <div className="flex items-center gap-2">
                 <p className="text-sm font-semibold text-gray-700">Alert</p>
+                {selectedAlerts.size > 0 && (
+                  <span className="text-xs text-blue-600 font-medium">
+                    ({selectedAlerts.size} selected)
+                  </span>
+                )}
               </div>
-              <div className="w-32">
-                <p className="text-sm font-semibold text-gray-700">Type</p>
-              </div>
-              <div className="w-32">
-                <p className="text-sm font-semibold text-gray-700">Date</p>
+              <p className="text-sm font-semibold text-gray-700">Competitor</p>
+              <p className="text-sm font-semibold text-gray-700">Type</p>
+              <p className="text-sm font-semibold text-gray-700">Date</p>
+              <div className="flex items-center gap-1">
+                {selectedAlerts.size > 0 ? (
+                  <>
+                    <button
+                      onClick={() => handleBulkMarkAsRead(true)}
+                      className="p-1.5 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
+                      title="Mark selected as read"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 19v-8.93a2 2 0 01.89-1.664l7-4.666a2 2 0 012.22 0l7 4.666A2 2 0 0121 10.07V19M3 19a2 2 0 002 2h14a2 2 0 002-2M3 19l6.75-4.5M21 19l-6.75-4.5M3 10l6.75 4.5M21 10l-6.75 4.5m0 0l-1.14.76a2 2 0 01-2.22 0l-1.14-.76" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleBulkMarkAsRead(false)}
+                      className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                      title="Mark selected as unread"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <span className="text-xs text-gray-500">Actions</span>
+                )}
               </div>
             </div>
 
@@ -472,60 +513,137 @@ function AlertsContent() {
                 text: 'text-gray-700',
                 icon: '📌',
               };
+              const alertDate = new Date(alert.createdAt);
+              const formattedDate = alertDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
 
               return (
                 <div
                   key={alert.id}
-                  className={`border rounded-lg p-4 transition-colors ${
+                  className={`border rounded-lg transition-colors ${
                     selectedAlerts.has(alert.id)
                       ? 'bg-blue-50 border-blue-300'
                       : 'bg-white border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox */}
+                  {/* Desktop Layout */}
+                  <div className="hidden md:grid md:grid-cols-[auto_1fr_180px_140px_140px_100px] items-center gap-4 px-4 py-3">
                     <input
                       type="checkbox"
                       checked={selectedAlerts.has(alert.id)}
                       onChange={() => handleSelectAlert(alert.id)}
-                      className="w-4 h-4 text-blue-600 rounded mt-1"
+                      className="w-4 h-4 text-blue-600 rounded"
                     />
-
-                    {/* Main Content */}
-                    <div className="flex-1 min-w-0">
-                      {/* Title and Status */}
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <p className="font-medium text-gray-900 break-words">{alert.message}</p>
-                        {!alert.isRead && (
-                          <span className="flex-shrink-0 px-2 py-1 bg-red-100 text-red-700 text-xs rounded-full font-medium whitespace-nowrap">
-                            New
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Competitor Info */}
-                      {alert.competitor && (
-                        <div className="mb-3">
-                          <Link
-                            href={`/dashboard/competitors/${alert.competitor.id}`}
-                            className="text-sm text-blue-600 hover:underline"
-                          >
-                            {alert.competitor.name}
-                          </Link>
-                        </div>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className={`font-medium truncate ${alert.isRead ? 'text-gray-500' : 'text-gray-900'}`}>
+                        {alert.message}
+                      </p>
+                      {!alert.isRead && (
+                        <span className="flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium">
+                          New
+                        </span>
                       )}
-
-                      {/* Alert Type and Date */}
-                      <div className="flex flex-wrap items-center gap-3">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${alertColor.bg} ${alertColor.text}`}
+                    </div>
+                    <div className="truncate">
+                      {alert.competitor ? (
+                        <Link
+                          href={`/dashboard/competitors/${alert.competitor.id}`}
+                          className="text-sm text-blue-600 hover:underline truncate"
                         >
-                          <span>{alertColor.icon}</span>
-                          {alert.alertType.replace('_', ' ')}
-                        </span>
-                        <span className="text-xs text-gray-600">
-                          {formatRelativeTime(alert.createdAt)}
-                        </span>
+                          {alert.competitor.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium w-fit ${alertColor.bg} ${alertColor.text}`}
+                    >
+                      <span>{alertColor.icon}</span>
+                      {alert.alertType.replace('_', ' ')}
+                    </span>
+                    <span className="text-sm text-gray-600">{formattedDate}</span>
+                    <button
+                      onClick={() => handleToggleRead(alert.id, alert.isRead)}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                        alert.isRead
+                          ? 'text-blue-600 hover:bg-blue-50 border border-blue-200'
+                          : 'text-green-600 hover:bg-green-50 border border-green-200'
+                      }`}
+                      title={alert.isRead ? 'Mark as unread' : 'Mark as read'}
+                    >
+                      {alert.isRead ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Unread
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Read
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Mobile Layout */}
+                  <div className="md:hidden p-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedAlerts.has(alert.id)}
+                        onChange={() => handleSelectAlert(alert.id)}
+                        className="w-4 h-4 text-blue-600 rounded mt-1"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className={`font-medium break-words ${alert.isRead ? 'text-gray-500' : 'text-gray-900'}`}>
+                            {alert.message}
+                          </p>
+                          {!alert.isRead && (
+                            <span className="flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium">
+                              New
+                            </span>
+                          )}
+                        </div>
+                        {alert.competitor && (
+                          <div className="mb-2">
+                            <Link
+                              href={`/dashboard/competitors/${alert.competitor.id}`}
+                              className="text-sm text-blue-600 hover:underline"
+                            >
+                              {alert.competitor.name}
+                            </Link>
+                          </div>
+                        )}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${alertColor.bg} ${alertColor.text}`}
+                            >
+                              <span>{alertColor.icon}</span>
+                              {alert.alertType.replace('_', ' ')}
+                            </span>
+                            <span className="text-xs text-gray-500">{formattedDate}</span>
+                          </div>
+                          <button
+                            onClick={() => handleToggleRead(alert.id, alert.isRead)}
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                              alert.isRead
+                                ? 'text-blue-600 hover:bg-blue-50 border border-blue-200'
+                                : 'text-green-600 hover:bg-green-50 border border-green-200'
+                            }`}
+                          >
+                            {alert.isRead ? 'Mark unread' : 'Mark read'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

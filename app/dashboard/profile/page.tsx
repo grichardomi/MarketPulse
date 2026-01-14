@@ -307,7 +307,7 @@ export default function ProfilePage() {
                 />
                 {email !== profile?.email && (
                   <p className="text-xs text-blue-600 mt-1">
-                    ℹ️ You'll receive a verification email to confirm the change
+                    ℹ️ You&apos;ll receive a verification email to confirm the change
                   </p>
                 )}
               </div>

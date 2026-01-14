@@ -48,15 +48,15 @@ export async function GET(req: NextRequest) {
       businessId: business.id,
     };
 
-    if (alertType && alertType !== 'all') {
+    if (alertType && alertType !== 'all' && alertType !== '') {
       where.alertType = alertType;
     }
 
-    if (isRead !== null && isRead !== undefined && isRead !== 'all') {
+    if (isRead && isRead !== 'all' && isRead !== '') {
       where.isRead = isRead === 'true';
     }
 
-    if (competitorId && competitorId !== 'all') {
+    if (competitorId && competitorId !== 'all' && competitorId !== '') {
       where.competitorId = parseInt(competitorId);
     }
 
@@ -101,14 +101,42 @@ export async function GET(req: NextRequest) {
       skip: offset,
     });
 
-    // Get alert type options for filters
+    // Build base filter (without specific filter types) for faceted counts
+    const baseWhere: any = { businessId: business.id };
+    if (dateFrom || dateTo) {
+      baseWhere.createdAt = {};
+      if (dateFrom) baseWhere.createdAt.gte = new Date(dateFrom);
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        baseWhere.createdAt.lte = endDate;
+      }
+    }
+
+    // Alert type counts - apply all filters except alertType
+    const alertTypeWhere: any = { ...baseWhere };
+    if (isRead !== null && isRead !== undefined && isRead !== 'all' && isRead !== '') {
+      alertTypeWhere.isRead = isRead === 'true';
+    }
+    if (competitorId && competitorId !== 'all' && competitorId !== '') {
+      alertTypeWhere.competitorId = parseInt(competitorId);
+    }
+
     const alertTypes = await db.alert.groupBy({
       by: ['alertType'],
-      where: { businessId: business.id },
+      where: alertTypeWhere,
       _count: true,
     });
 
-    // Get competitor list for filters
+    // Competitor counts - apply all filters except competitorId
+    const competitorWhere: any = { ...baseWhere };
+    if (alertType && alertType !== 'all' && alertType !== '') {
+      competitorWhere.alertType = alertType;
+    }
+    if (isRead !== null && isRead !== undefined && isRead !== 'all' && isRead !== '') {
+      competitorWhere.isRead = isRead === 'true';
+    }
+
     const competitors = await db.competitor.findMany({
       where: { businessId: business.id },
       select: {
@@ -116,7 +144,7 @@ export async function GET(req: NextRequest) {
         name: true,
         _count: {
           select: {
-            Alert: { where: { businessId: business.id } },
+            Alert: { where: competitorWhere },
           },
         },
       },
