@@ -34,10 +34,16 @@ export async function POST(req: Request) {
     });
 
     if (existing) {
-      // Update last used
+      // Re-associate subscription to current user and refresh keys/user agent
       await db.pushSubscription.update({
         where: { endpoint: subscription.endpoint },
-        data: { lastUsedAt: new Date() },
+        data: {
+          userId: user.id,
+          p256dh: subscription.keys.p256dh,
+          auth: subscription.keys.auth,
+          userAgent: userAgent || null,
+          lastUsedAt: new Date(),
+        },
       });
       return NextResponse.json({ success: true, existing: true });
     }

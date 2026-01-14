@@ -28,10 +28,9 @@ export async function POST(req: Request) {
       );
     }
 
-    // Delete subscription
+    // Delete subscription by endpoint to avoid cross-user delivery
     await db.pushSubscription.deleteMany({
       where: {
-        userId: user.id,
         endpoint,
       },
     });

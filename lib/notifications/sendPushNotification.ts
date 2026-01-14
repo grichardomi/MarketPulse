@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { db } from '@/lib/db/prisma';
+import { calculateScheduledTime } from '@/lib/email/quiet-hours';
 
 // Configure web-push with VAPID keys
 const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -141,6 +142,31 @@ export async function sendAlertPushNotification(
 
     const user = alert.Competitor.Business.User;
     const competitor = alert.Competitor;
+
+    const preferences = await db.notificationPreferences.findUnique({
+      where: { userId: user.id },
+    });
+
+    if (!preferences) {
+      return { sent: 0, failed: 0 };
+    }
+
+    const alertTypes = preferences.alertTypes as string[] | null;
+    if (!alertTypes || !alertTypes.includes(alert.alertType)) {
+      return { sent: 0, failed: 0 };
+    }
+
+    const now = new Date();
+    const scheduledFor = calculateScheduledTime(
+      now,
+      preferences.quietHoursStart,
+      preferences.quietHoursEnd,
+      preferences.timezone
+    );
+
+    if (scheduledFor.getTime() > now.getTime()) {
+      return { sent: 0, failed: 0 };
+    }
 
     // Create notification payload
     const payload: PushNotificationPayload = {

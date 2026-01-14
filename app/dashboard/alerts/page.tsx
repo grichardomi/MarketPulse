@@ -60,6 +60,11 @@ function AlertsContent() {
   const [total, setTotal] = useState(0);
   const [selectedAlerts, setSelectedAlerts] = useState<Set<number>>(new Set());
   const [undoAction, setUndoAction] = useState<{ alertIds: number[]; previousState: boolean } | null>(null);
+  const notifyAlertsUpdated = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('alerts-updated'));
+    }
+  }, []);
 
   // Filters
   const [alertType, setAlertType] = useState(searchParams.get('alertType') || 'all');
@@ -178,6 +183,7 @@ function AlertsContent() {
         ));
         throw new Error('Failed to update alert');
       }
+      notifyAlertsUpdated();
     } catch (err) {
       console.error('Failed to update alert:', err);
       setError('Failed to update alert');
@@ -222,6 +228,7 @@ function AlertsContent() {
         }));
         throw new Error('Failed to update alerts');
       }
+      notifyAlertsUpdated();
     } catch (err) {
       console.error('Failed to update alerts:', err);
       setError('Failed to update alerts');
@@ -250,6 +257,7 @@ function AlertsContent() {
           isRead: previousState,
         }),
       });
+      notifyAlertsUpdated();
     } catch (err) {
       console.error('Failed to undo:', err);
       loadAlerts();

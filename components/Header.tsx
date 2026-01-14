@@ -21,14 +21,23 @@ interface HeaderProps {
 export default function Header({ subscription }: HeaderProps) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = window.sessionStorage.getItem('unreadAlertCount');
+    const parsed = stored ? parseInt(stored, 10) : 0;
+    return Number.isNaN(parsed) ? 0 : parsed;
+  });
 
   const fetchUnreadCount = useCallback(async () => {
     try {
       const res = await fetch('/api/alerts?limit=1&isRead=false');
       if (res.ok) {
         const data = await res.json();
-        setUnreadCount(data.total || 0);
+        const nextCount = data.total || 0;
+        setUnreadCount(nextCount);
+        if (typeof window !== 'undefined') {
+          window.sessionStorage.setItem('unreadAlertCount', String(nextCount));
+        }
       }
     } catch (err) {
       console.error('Failed to fetch unread count:', err);
@@ -51,6 +60,18 @@ export default function Header({ subscription }: HeaderProps) {
       fetchUnreadCount();
     }
   }, [pathname, status, fetchUnreadCount]);
+
+  // Refresh when alerts are updated elsewhere
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleAlertsUpdated = () => {
+      if (status === 'authenticated') {
+        fetchUnreadCount();
+      }
+    };
+    window.addEventListener('alerts-updated', handleAlertsUpdated);
+    return () => window.removeEventListener('alerts-updated', handleAlertsUpdated);
+  }, [status, fetchUnreadCount]);
 
   // Check if user has support access (Professional or Enterprise plans only)
   // Professional = 15 competitors, Enterprise = 50 competitors
