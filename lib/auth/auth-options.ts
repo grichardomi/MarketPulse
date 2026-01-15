@@ -75,7 +75,12 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account }) {
-      if (!user.email) return false;
+      console.log('[Auth] signIn callback triggered', { email: user.email, provider: account?.provider });
+
+      if (!user.email) {
+        console.log('[Auth] No email provided, rejecting sign-in');
+        return false;
+      }
 
       try {
         // For Credentials provider, user already exists (verified in authorize)
@@ -162,9 +167,10 @@ export const authOptions: NextAuthOptions = {
           }
         }
 
+        console.log('[Auth] signIn successful for', user.email);
         return true;
       } catch (error) {
-        console.error('SignIn error:', error);
+        console.error('[Auth] SignIn error:', error);
         return false;
       }
     },
@@ -216,5 +222,5 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug logging to diagnose OAuth issues
 };
