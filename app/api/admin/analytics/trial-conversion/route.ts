@@ -2,20 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { db } from '@/lib/db/prisma';
-import type { Prisma } from '@prisma/client';
-
-
-type TrialSubscription = Prisma.SubscriptionGetPayload<{
-  include: {
-    User: {
-      select: {
-        id: true;
-        email: true;
-        createdAt: true;
-      };
-    };
+type TrialSubscription = {
+  userId: string;
+  status: string;
+  currentPeriodEnd: Date | string;
+  createdAt: Date | string;
+  User: {
+    email: string;
   };
-}>;
+};
 /**
  * GET /api/admin/analytics/trial-conversion
  * Get trial conversion analytics
@@ -44,7 +39,7 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days);
 
     // Get all trial subscriptions created in the time period
-    const allTrials: TrialSubscription[] = await db.subscription.findMany({
+    const allTrials = await db.subscription.findMany({
       where: {
         stripePriceId: 'trial',
         createdAt: {
@@ -63,7 +58,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
-    });
+    }) as TrialSubscription[];
 
     // Get paid subscriptions for users who had trials
     const userIds = allTrials.map((t) => t.userId);
