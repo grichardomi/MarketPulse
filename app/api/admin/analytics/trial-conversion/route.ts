@@ -3,12 +3,21 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/auth-options';
 import { db } from '@/lib/db/prisma';
 type TrialSubscription = {
-  userId: string;
+  id: number;
+  userId: number;
   status: string;
-  currentPeriodEnd: Date | string;
-  createdAt: Date | string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  competitorLimit: number;
+  createdAt: Date;
+  updatedAt: Date;
   User: {
+    id: number;
     email: string;
+    createdAt: Date;
   };
 };
 /**
@@ -58,7 +67,7 @@ export async function GET(request: NextRequest) {
       orderBy: {
         createdAt: 'desc',
       },
-    }) as TrialSubscription[];
+    }) as unknown as TrialSubscription[];
 
     // Get paid subscriptions for users who had trials
     const userIds = allTrials.map((t) => t.userId);
