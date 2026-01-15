@@ -1,6 +1,9 @@
 import { getServerSession } from 'next-auth';
+import { PrismaClient } from '@prisma/client';
 import { authOptions } from '@/lib/auth/auth-options';
 import { db } from '@/lib/db/prisma';
+
+type TransactionClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>;
 import { accountDeletionSchema } from '@/lib/validation/user';
 import { verifyPassword } from '@/lib/auth/password';
 
@@ -55,7 +58,7 @@ export async function POST(req: Request) {
     // Delete user and all associated data in transaction
     // Note: Most data will cascade delete due to Prisma schema,
     // but we explicitly delete some items for clarity and safety
-    await db.$transaction(async (tx) => {
+    await db.$transaction(async (tx: TransactionClient) => {
       // Delete notification preferences
       await tx.notificationPreferences.deleteMany({
         where: { userId: user.id },
