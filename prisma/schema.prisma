@@ -34,14 +34,18 @@ model Alert {
   message         String
   details         Json?
   isRead          Boolean           @default(false)
+  dedupeKey       String?           // Hash of competitorId + alertType + content for deduplication
+  emailSentAt     DateTime?         // Track when email was sent for this alert
   createdAt       DateTime          @default(now())
   Business        Business          @relation(fields: [businessId], references: [id], onDelete: Cascade)
   Competitor      Competitor?       @relation(fields: [competitorId], references: [id])
   WebhookDelivery WebhookDelivery[]
 
+  @@unique([competitorId, alertType, dedupeKey]) // Prevent duplicate alerts
   @@index([businessId])
   @@index([competitorId])
   @@index([isRead])
+  @@index([dedupeKey])
 }
 
 model Business {
@@ -76,6 +80,7 @@ model Competitor {
   contentHash           String?
   textHash              String?
   lastCrawledAt         DateTime?
+  lastAlertAt           DateTime?       // Track last alert for cooldown
   crawlFrequencyMinutes Int             @default(720)
   isActive              Boolean         @default(true)
   createdAt             DateTime        @default(now())
@@ -96,7 +101,7 @@ model Competitor {
 
 model CrawlQueue {
   id           Int      @id @default(autoincrement())
-  competitorId Int
+  competitorId Int      @unique // Prevents duplicate jobs for same competitor
   url          String
   priority     Int      @default(0)
   attempt      Int      @default(0)
@@ -111,6 +116,7 @@ model CrawlQueue {
 model EmailQueue {
   id           Int       @id @default(autoincrement())
   userId       Int
+  alertId      Int?      // Reference to alert that triggered this email
   toEmail      String
   templateName String
   templateData Json
@@ -123,8 +129,10 @@ model EmailQueue {
   createdAt    DateTime  @default(now())
   User         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([alertId]) // One email per alert
   @@index([scheduledFor])
   @@index([status])
+  @@index([userId, templateName, createdAt]) // For cooldown checks
 }
 
 model ExtractionCache {

@@ -57,9 +57,10 @@ export async function enqueueJobs(): Promise<SchedulerResult> {
         const isFirstCrawl = !competitor.lastCrawledAt;
         const priority = isFirstCrawl ? 100 : 0;
 
-        // Enqueue job
-        await db.crawlQueue.create({
-          data: {
+        // Upsert job - prevents duplicates via unique constraint on competitorId
+        const result = await db.crawlQueue.upsert({
+          where: { competitorId: competitor.id },
+          create: {
             competitorId: competitor.id,
             url: competitor.url,
             priority,
@@ -67,20 +68,24 @@ export async function enqueueJobs(): Promise<SchedulerResult> {
             maxAttempts: 3,
             scheduledFor: new Date(),
           },
+          update: {
+            // Only update if the job hasn't started yet (attempt = 0)
+            // Don't reset jobs that are already being processed
+          },
         });
 
-        enqueued++;
-        console.log(
-          `Enqueued competitor ${competitor.id} (${competitor.url}) - priority: ${priority}`
-        );
-      } catch (error) {
-        // Likely duplicate key error if job already exists - skip silently
-        if (error instanceof Error && error.message.includes('Unique constraint')) {
-          skipped++;
+        // Check if this was a create or update (new job vs existing)
+        if (result.attempt === 0 && result.createdAt.getTime() > Date.now() - 1000) {
+          enqueued++;
+          console.log(
+            `Enqueued competitor ${competitor.id} (${competitor.url}) - priority: ${priority}`
+          );
         } else {
-          errors++;
-          console.error(`Error enqueuing competitor ${competitor.id}:`, error);
+          skipped++;
         }
+      } catch (error) {
+        errors++;
+        console.error(`Error enqueuing competitor ${competitor.id}:`, error);
       }
     }
 

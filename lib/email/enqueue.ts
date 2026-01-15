@@ -8,6 +8,7 @@ interface EnqueueEmailParams {
   templateName: string;
   templateData: any;
   alertType: string;
+  alertId?: number; // Link email to alert for deduplication
 }
 
 /**
@@ -19,6 +20,7 @@ export async function enqueueEmail({
   templateName,
   templateData,
   alertType,
+  alertId,
 }: EnqueueEmailParams): Promise<{ success: boolean; queueId?: string; reason?: string }> {
   try {
     // Fetch user preferences
@@ -52,22 +54,34 @@ export async function enqueueEmail({
       preferences.timezone
     );
 
-    // Insert into EmailQueue
-    const queueEntry = await db.emailQueue.create({
-      data: {
-        userId,
-        toEmail,
-        templateName,
-        templateData,
-        scheduledFor,
-        status: 'pending',
-      },
-    });
+    // Insert into EmailQueue (alertId unique constraint prevents duplicates)
+    try {
+      const queueEntry = await db.emailQueue.create({
+        data: {
+          userId,
+          alertId,
+          toEmail,
+          templateName,
+          templateData,
+          scheduledFor,
+          status: 'pending',
+        },
+      });
 
-    return {
-      success: true,
-      queueId: String(queueEntry.id),
-    };
+      return {
+        success: true,
+        queueId: String(queueEntry.id),
+      };
+    } catch (err: any) {
+      // Handle duplicate email for same alert
+      if (err.code === 'P2002' && alertId) {
+        return {
+          success: false,
+          reason: 'Email already queued for this alert',
+        };
+      }
+      throw err;
+    }
   } catch (error) {
     console.error('Failed to enqueue email:', error);
     return {
@@ -149,13 +163,14 @@ export async function enqueueAlertEmail(alertId: number): Promise<{ success: boo
       unsubscribeUrl: getDashboardUrl('/dashboard/settings'),
     };
 
-    // Enqueue email
+    // Enqueue email (alertId prevents duplicate emails for same alert)
     return await enqueueEmail({
       userId: alert.Business!.userId,
       toEmail: alert.Business!.User.email,
       templateName: 'alert_notification',
       templateData,
       alertType: alert.alertType,
+      alertId,
     });
   } catch (error) {
     console.error('Failed to enqueue alert email:', error);

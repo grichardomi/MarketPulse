@@ -2,6 +2,10 @@ import { db } from '@/lib/db/prisma';
 import { ExtractedData } from './ai-extractor';
 import { enqueueAlertEmail } from '@/lib/email/enqueue';
 import { sendAlertPushNotification } from '@/lib/notifications/sendPushNotification';
+import crypto from 'crypto';
+
+// Cooldown period between alerts of same type for same competitor (in hours)
+const ALERT_COOLDOWN_HOURS = 1;
 
 export interface ChangeDetectionResult {
   hasChanges: boolean;
@@ -50,82 +54,145 @@ export async function detectChanges(
   const changes = analyzeChanges(previousData, newData);
 
   if (changes.changeTypes.length > 0) {
-    // Create alerts for each change type
+    // Check cooldown - get last alert time for this competitor
+    const competitor = await db.competitor.findUnique({
+      where: { id: competitorId },
+      select: { lastAlertAt: true },
+    });
+
+    const cooldownTime = new Date(Date.now() - ALERT_COOLDOWN_HOURS * 60 * 60 * 1000);
+    const isInCooldown = competitor?.lastAlertAt && competitor.lastAlertAt > cooldownTime;
+
+    if (isInCooldown) {
+      console.log(`Competitor ${competitorId} is in alert cooldown, skipping alerts`);
+      return {
+        hasChanges: true,
+        changeTypes: changes.changeTypes,
+        message: 'Changes detected but alert cooldown active',
+        details: { cooldown: true },
+      };
+    }
+
+    // Create alerts for each change type with dedupeKey
     const alerts = [];
 
+    // Helper to create dedupeKey from content
+    const createDedupeKey = (alertType: string, content: any): string => {
+      const hash = crypto.createHash('md5');
+      hash.update(JSON.stringify({ alertType, content }));
+      return hash.digest('hex').substring(0, 16);
+    };
+
     if (changes.changeTypes.includes('price_change')) {
-      const priceAlert = await db.alert.create({
-        data: {
-          businessId,
-          competitorId,
-          alertType: 'price_change',
-          message: changes.priceChangeMessage,
-          details: changes.priceChanges as any,
-          isRead: false,
-        },
-      });
-      alerts.push(priceAlert);
+      const dedupeKey = createDedupeKey('price_change', changes.priceChanges);
+      try {
+        const priceAlert = await db.alert.create({
+          data: {
+            businessId,
+            competitorId,
+            alertType: 'price_change',
+            message: changes.priceChangeMessage,
+            details: changes.priceChanges as any,
+            dedupeKey,
+            isRead: false,
+          },
+        });
+        alerts.push(priceAlert);
 
-      // Enqueue email notification
-      enqueueAlertEmail(priceAlert.id).catch((err) => {
-        console.error('Failed to enqueue price alert email:', err);
-      });
+        // Enqueue email notification
+        enqueueAlertEmail(priceAlert.id).catch((err) => {
+          console.error('Failed to enqueue price alert email:', err);
+        });
 
-      // Send push notification
-      sendAlertPushNotification(priceAlert.id).catch((err) => {
-        console.error('Failed to send price alert push notification:', err);
-      });
+        // Send push notification
+        sendAlertPushNotification(priceAlert.id).catch((err) => {
+          console.error('Failed to send price alert push notification:', err);
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          console.log(`Duplicate price_change alert skipped for competitor ${competitorId}`);
+        } else {
+          throw err;
+        }
+      }
     }
 
     if (changes.changeTypes.includes('new_promotion')) {
-      const promotionAlert = await db.alert.create({
-        data: {
-          businessId,
-          competitorId,
-          alertType: 'new_promotion',
-          message: changes.promotionChangeMessage,
-          details: changes.promotionChanges as any,
-          isRead: false,
-        },
-      });
-      alerts.push(promotionAlert);
+      const dedupeKey = createDedupeKey('new_promotion', changes.promotionChanges);
+      try {
+        const promotionAlert = await db.alert.create({
+          data: {
+            businessId,
+            competitorId,
+            alertType: 'new_promotion',
+            message: changes.promotionChangeMessage,
+            details: changes.promotionChanges as any,
+            dedupeKey,
+            isRead: false,
+          },
+        });
+        alerts.push(promotionAlert);
 
-      // Enqueue email notification
-      enqueueAlertEmail(promotionAlert.id).catch((err) => {
-        console.error('Failed to enqueue promotion alert email:', err);
-      });
+        // Enqueue email notification
+        enqueueAlertEmail(promotionAlert.id).catch((err) => {
+          console.error('Failed to enqueue promotion alert email:', err);
+        });
 
-      // Send push notification
-      sendAlertPushNotification(promotionAlert.id).catch((err) => {
-        console.error('Failed to send promotion alert push notification:', err);
-      });
+        // Send push notification
+        sendAlertPushNotification(promotionAlert.id).catch((err) => {
+          console.error('Failed to send promotion alert push notification:', err);
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          console.log(`Duplicate new_promotion alert skipped for competitor ${competitorId}`);
+        } else {
+          throw err;
+        }
+      }
     }
 
     if (changes.changeTypes.includes('menu_change')) {
-      const menuAlert = await db.alert.create({
-        data: {
-          businessId,
-          competitorId,
-          alertType: 'menu_change',
-          message: changes.menuChangeMessage,
-          details: changes.menuChanges as any,
-          isRead: false,
-        },
-      });
-      alerts.push(menuAlert);
+      const dedupeKey = createDedupeKey('menu_change', changes.menuChanges);
+      try {
+        const menuAlert = await db.alert.create({
+          data: {
+            businessId,
+            competitorId,
+            alertType: 'menu_change',
+            message: changes.menuChangeMessage,
+            details: changes.menuChanges as any,
+            dedupeKey,
+            isRead: false,
+          },
+        });
+        alerts.push(menuAlert);
 
-      // Enqueue email notification
-      enqueueAlertEmail(menuAlert.id).catch((err) => {
-        console.error('Failed to enqueue menu alert email:', err);
-      });
+        // Enqueue email notification
+        enqueueAlertEmail(menuAlert.id).catch((err) => {
+          console.error('Failed to enqueue menu alert email:', err);
+        });
 
-      // Send push notification
-      sendAlertPushNotification(menuAlert.id).catch((err) => {
-        console.error('Failed to send menu alert push notification:', err);
-      });
+        // Send push notification
+        sendAlertPushNotification(menuAlert.id).catch((err) => {
+          console.error('Failed to send menu alert push notification:', err);
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          console.log(`Duplicate menu_change alert skipped for competitor ${competitorId}`);
+        } else {
+          throw err;
+        }
+      }
     }
 
-    console.log(`Created ${alerts.length} alerts for competitor ${competitorId}`);
+    // Update lastAlertAt on competitor if any alerts were created
+    if (alerts.length > 0) {
+      await db.competitor.update({
+        where: { id: competitorId },
+        data: { lastAlertAt: new Date() },
+      });
+      console.log(`Created ${alerts.length} alerts for competitor ${competitorId}`);
+    }
   }
 
   return {
