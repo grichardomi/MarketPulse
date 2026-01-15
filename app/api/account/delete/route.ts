@@ -55,7 +55,6 @@ export async function POST(req: Request) {
     // Delete user and all associated data in transaction
     // Note: Most data will cascade delete due to Prisma schema,
     // but we explicitly delete some items for clarity and safety
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.$transaction(async (tx: any) => {
       // Delete notification preferences
       await tx.notificationPreferences.deleteMany({
