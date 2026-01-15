@@ -44,6 +44,22 @@ export function generateMetadata({
   const pageUrl = `${siteConfig.url}${path}`;
   const imageUrl = image.startsWith('http') ? image : `${siteConfig.url}${image}`;
 
+  const googleVerification =
+    process.env.GOOGLE_SITE_VERIFICATION ||
+    process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION;
+  const yandexVerification =
+    process.env.YANDEX_SITE_VERIFICATION ||
+    process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION;
+  const bingVerification =
+    process.env.BING_SITE_VERIFICATION ||
+    process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION;
+
+  const verification = {
+    ...(googleVerification ? { google: googleVerification } : {}),
+    ...(yandexVerification ? { yandex: yandexVerification } : {}),
+    ...(bingVerification ? { bing: bingVerification } : {}),
+  };
+
   return {
     title: pageTitle,
     description: pageDescription,
@@ -62,14 +78,7 @@ export function generateMetadata({
       title: pageTitle,
       description: pageDescription,
       siteName: siteConfig.name,
-      images: [
-        {
-          url: imageUrl,
-          width: 1200,
-          height: 630,
-          alt: pageTitle,
-        },
-      ],
+      images: [imageUrl],
     },
     twitter: {
       card: 'summary_large_image',
@@ -95,11 +104,7 @@ export function generateMetadata({
             'max-snippet': -1,
           },
         },
-    verification: {
-      google: 'your-google-site-verification-code', // Add actual code when available
-      // yandex: 'your-yandex-verification-code',
-      // bing: 'your-bing-verification-code',
-    },
+    verification: Object.keys(verification).length ? verification : undefined,
   };
 }
 

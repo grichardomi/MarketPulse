@@ -5,17 +5,81 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export default function ContactPage() {
+  const fieldLimits = {
+    name: { min: 2, max: 100 },
+    email: { max: 254 },
+    subject: { min: 3, max: 200 },
+    message: { min: 10, max: 2000 },
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     subject: '',
     message: '',
   });
+
+  const [touched, setTouched] = useState({
+    name: false,
+    email: false,
+    subject: false,
+    message: false,
+  });
+
   const [status, setStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Validation functions
+  const validateName = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Name is required';
+    if (trimmed.length < fieldLimits.name.min) return `Name must be at least ${fieldLimits.name.min} characters`;
+    if (trimmed.length > fieldLimits.name.max) return `Name must be less than ${fieldLimits.name.max} characters`;
+    if (!/^[a-zA-Z\s\-'.]+$/.test(trimmed)) return 'Name can only contain letters, spaces, hyphens, and apostrophes';
+    return null;
+  };
+
+  const validateEmail = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Email is required';
+    if (trimmed.length > fieldLimits.email.max) return `Email must be less than ${fieldLimits.email.max} characters`;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) return 'Please enter a valid email address';
+    return null;
+  };
+
+  const validateSubject = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Subject is required';
+    if (trimmed.length < fieldLimits.subject.min) return `Subject must be at least ${fieldLimits.subject.min} characters`;
+    if (trimmed.length > fieldLimits.subject.max) return `Subject must be less than ${fieldLimits.subject.max} characters`;
+    return null;
+  };
+
+  const validateMessage = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Message is required';
+    if (trimmed.length < fieldLimits.message.min) return `Message must be at least ${fieldLimits.message.min} characters`;
+    if (trimmed.length > fieldLimits.message.max) return `Message must be less than ${fieldLimits.message.max} characters`;
+    return null;
+  };
+
+  // Compute field errors
+  const fieldErrors = {
+    name: validateName(formData.name),
+    email: validateEmail(formData.email),
+    subject: validateSubject(formData.subject),
+    message: validateMessage(formData.message),
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Mark all fields as touched on submit attempt
+    setTouched({ name: true, email: true, subject: true, message: true });
+
+    if (!isFormValid) {
+      return;
+    }
     setStatus('sending');
     setErrorMessage('');
 
@@ -23,7 +87,7 @@ export default function ContactPage() {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(trimmedFormData),
       });
 
       if (!res.ok) {
@@ -33,6 +97,7 @@ export default function ContactPage() {
 
       setStatus('success');
       setFormData({ name: '', email: '', subject: '', message: '' });
+      setTouched({ name: false, email: false, subject: false, message: false });
     } catch (error: any) {
       setStatus('error');
       setErrorMessage(error.message || 'Failed to send message. Please try again.');
@@ -40,11 +105,32 @@ export default function ContactPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
   };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name } = e.target;
+    setTouched((prev) => ({
+      ...prev,
+      [name]: true,
+    }));
+  };
+
+  const trimmedFormData = {
+    name: formData.name.trim(),
+    email: formData.email.trim(),
+    subject: formData.subject.trim(),
+    message: formData.message.trim(),
+  };
+
+  const isFormValid = !fieldErrors.name && !fieldErrors.email && !fieldErrors.subject && !fieldErrors.message;
+
+  // Helper to determine if error should be shown
+  const showError = (field: keyof typeof touched) => touched[field] && fieldErrors[field];
 
   return (
     <>
@@ -100,7 +186,7 @@ export default function ContactPage() {
                 {/* Name Field */}
                 <div>
                   <label htmlFor="name" className="block text-sm font-medium text-gray-900 mb-2">
-                    Name *
+                    Name <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -108,16 +194,28 @@ export default function ContactPage() {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                    onBlur={handleBlur}
+                    maxLength={fieldLimits.name.max}
+                    aria-invalid={showError('name') ? 'true' : 'false'}
+                    aria-describedby={showError('name') ? 'name-error' : undefined}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none text-base transition-colors ${
+                      showError('name')
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     placeholder="Your name"
                   />
+                  {showError('name') && (
+                    <p id="name-error" className="mt-1.5 text-sm text-red-600" role="alert">
+                      {fieldErrors.name}
+                    </p>
+                  )}
                 </div>
 
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-900 mb-2">
-                    Email *
+                    Email <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="email"
@@ -125,16 +223,28 @@ export default function ContactPage() {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                    onBlur={handleBlur}
+                    maxLength={fieldLimits.email.max}
+                    aria-invalid={showError('email') ? 'true' : 'false'}
+                    aria-describedby={showError('email') ? 'email-error' : undefined}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none text-base transition-colors ${
+                      showError('email')
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     placeholder="your@email.com"
                   />
+                  {showError('email') && (
+                    <p id="email-error" className="mt-1.5 text-sm text-red-600" role="alert">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
 
                 {/* Subject Field */}
                 <div>
                   <label htmlFor="subject" className="block text-sm font-medium text-gray-900 mb-2">
-                    Subject *
+                    Subject <span className="text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -142,27 +252,62 @@ export default function ContactPage() {
                     name="subject"
                     value={formData.subject}
                     onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                    onBlur={handleBlur}
+                    maxLength={fieldLimits.subject.max}
+                    aria-invalid={showError('subject') ? 'true' : 'false'}
+                    aria-describedby={showError('subject') ? 'subject-error' : undefined}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none text-base transition-colors ${
+                      showError('subject')
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     placeholder="How can we help?"
                   />
+                  {showError('subject') && (
+                    <p id="subject-error" className="mt-1.5 text-sm text-red-600" role="alert">
+                      {fieldErrors.subject}
+                    </p>
+                  )}
                 </div>
 
                 {/* Message Field */}
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-gray-900 mb-2">
-                    Message *
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label htmlFor="message" className="block text-sm font-medium text-gray-900">
+                      Message <span className="text-red-600">*</span>
+                    </label>
+                    <span className={`text-xs ${
+                      formData.message.length > fieldLimits.message.max
+                        ? 'text-red-600'
+                        : formData.message.length > fieldLimits.message.max * 0.9
+                          ? 'text-amber-600'
+                          : 'text-gray-500'
+                    }`}>
+                      {formData.message.length}/{fieldLimits.message.max}
+                    </span>
+                  </div>
                   <textarea
                     id="message"
                     name="message"
                     value={formData.message}
                     onChange={handleChange}
-                    required
+                    onBlur={handleBlur}
+                    maxLength={fieldLimits.message.max}
                     rows={6}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base resize-none"
+                    aria-invalid={showError('message') ? 'true' : 'false'}
+                    aria-describedby={showError('message') ? 'message-error' : undefined}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:outline-none text-base resize-none transition-colors ${
+                      showError('message')
+                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                     placeholder="Tell us more about your inquiry..."
                   />
+                  {showError('message') && (
+                    <p id="message-error" className="mt-1.5 text-sm text-red-600" role="alert">
+                      {fieldErrors.message}
+                    </p>
+                  )}
                 </div>
 
                 {/* Error Message */}
@@ -175,7 +320,7 @@ export default function ContactPage() {
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  disabled={status === 'sending'}
+                  disabled={status === 'sending' || !isFormValid}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {status === 'sending' ? 'Sending...' : 'Send Message'}

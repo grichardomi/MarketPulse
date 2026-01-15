@@ -19,6 +19,7 @@ export default function Footer() {
       { label: 'Terms of Service', href: '/terms' },
     ],
     support: [
+      { label: 'Search', href: '/search' },
       { label: 'Help Center', href: '/help' },
       { label: 'Status', href: '/status' },
     ],

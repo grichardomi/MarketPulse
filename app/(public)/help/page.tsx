@@ -3,73 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
-
-interface HelpArticle {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  icon: string;
-}
-
-const helpArticles: HelpArticle[] = [
-  {
-    id: 'getting-started',
-    title: 'Getting Started',
-    description: 'Learn how to set up your account and add your first competitor',
-    category: 'Basics',
-    icon: '🚀',
-  },
-  {
-    id: 'adding-competitors',
-    title: 'Adding Competitors',
-    description: 'Step-by-step guide to monitoring your competitors',
-    category: 'Basics',
-    icon: '👥',
-  },
-  {
-    id: 'understanding-alerts',
-    title: 'Understanding Alerts',
-    description: 'Learn about different alert types and how to manage them',
-    category: 'Features',
-    icon: '🔔',
-  },
-  {
-    id: 'managing-subscription',
-    title: 'Managing Your Subscription',
-    description: 'Upgrade, downgrade, or cancel your subscription',
-    category: 'Billing',
-    icon: '💳',
-  },
-  {
-    id: 'price-tracking',
-    title: 'Price Tracking',
-    description: 'How price monitoring and change detection works',
-    category: 'Features',
-    icon: '💰',
-  },
-  {
-    id: 'notification-settings',
-    title: 'Notification Settings',
-    description: 'Configure how and when you receive alerts',
-    category: 'Settings',
-    icon: '⚙️',
-  },
-  {
-    id: 'troubleshooting',
-    title: 'Troubleshooting',
-    description: 'Common issues and how to resolve them',
-    category: 'Support',
-    icon: '🔧',
-  },
-  {
-    id: 'account-security',
-    title: 'Account Security',
-    description: 'Keep your account safe with best practices',
-    category: 'Security',
-    icon: '🔒',
-  },
-];
+import { helpArticles } from '@/lib/content/help-content';
 
 const categories = Array.from(new Set(helpArticles.map((a) => a.category)));
 
