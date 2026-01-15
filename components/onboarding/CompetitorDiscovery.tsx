@@ -95,6 +95,9 @@ export default function CompetitorDiscovery({
         setCompetitors([]);
         setShowResults(false);
       } else {
+        if (data.trackingError) {
+          setError(data.trackingError);
+        }
         setCompetitors(data.competitors);
         setShowResults(true);
 

@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     // Authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get user from database
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       console.log(`[Discovery] Cache HIT - returning ${cached.length} cached results`);
 
       // Track analytics
-      await trackDiscovery(
+      const trackingError = await trackDiscovery(
         user.id,
         normalizedIndustry,
         normalizedCity,
@@ -73,6 +73,7 @@ export async function POST(req: Request) {
         competitors: cached,
         cached: true,
         count: cached.length,
+        trackingError,
       });
     }
 
@@ -130,7 +131,7 @@ export async function POST(req: Request) {
 
     // Track analytics
     const duration = Date.now() - startTime;
-    await trackDiscovery(
+    const trackingError = await trackDiscovery(
       user.id,
       normalizedIndustry,
       normalizedCity,
@@ -147,6 +148,7 @@ export async function POST(req: Request) {
       competitors: resolved,
       cached: false,
       count: resolved.length,
+      trackingError,
     });
   } catch (error) {
     console.error('[Discovery] Error:', error);
@@ -195,21 +197,26 @@ async function trackDiscovery(
   resultCount: number,
   cached: boolean,
   duration: number
-): Promise<void> {
+): Promise<string | null> {
   try {
-    await prisma.discoveryEvent.create({
-      data: {
-        userId,
-        industry,
-        city,
-        state,
-        resultCount,
-        cached,
-        duration,
-      },
+    await prisma.discoveryEvent.createMany({
+      data: [
+        {
+          userId,
+          industry,
+          city,
+          state,
+          resultCount,
+          cached,
+          duration,
+        },
+      ],
+      skipDuplicates: true,
     });
+    return null;
   } catch (error) {
     // Don't fail the request if analytics tracking fails
     console.error('[Discovery] Analytics tracking error:', error);
+    return 'Analytics tracking failed. Results were returned, but we could not save analytics.';
   }
 }
