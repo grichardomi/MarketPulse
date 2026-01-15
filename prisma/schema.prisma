@@ -82,6 +82,7 @@ model Competitor {
   lastCrawledAt         DateTime?
   lastAlertAt           DateTime?       // Track last alert for cooldown
   crawlFrequencyMinutes Int             @default(720)
+  consecutiveFailures   Int             @default(0) // Track failures for auto-deactivation
   isActive              Boolean         @default(true)
   createdAt             DateTime        @default(now())
   updatedAt             DateTime

@@ -111,6 +111,28 @@ export async function processJob(job: CrawlJob): Promise<ProcessResult> {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       console.error(`[Job ${job.id}] Crawl failed: ${errorMsg}`);
 
+      // Increment consecutive failures
+      const updatedCompetitor = await db.competitor.update({
+        where: { id: competitor.id },
+        data: { consecutiveFailures: { increment: 1 } },
+      });
+
+      // Auto-deactivate after 3 consecutive failures
+      if (updatedCompetitor.consecutiveFailures >= 3) {
+        await db.competitor.update({
+          where: { id: competitor.id },
+          data: { isActive: false },
+        });
+        console.log(`[Job ${job.id}] Competitor ${competitor.id} auto-deactivated after ${updatedCompetitor.consecutiveFailures} consecutive failures`);
+
+        return {
+          success: false,
+          competitorId: job.competitorId,
+          message: `Crawl failed and competitor deactivated after ${updatedCompetitor.consecutiveFailures} failures: ${errorMsg}`,
+          error: 'CRAWL_FAILED_DEACTIVATED',
+        };
+      }
+
       // Retry if attempts remain
       if (job.attempt < job.maxAttempts) {
         await db.crawlQueue.create({
@@ -234,12 +256,13 @@ export async function processJob(job: CrawlJob): Promise<ProcessResult> {
       };
     }
 
-    // Step 5: Update competitor last crawled time
+    // Step 5: Update competitor last crawled time and reset failure count
     try {
       await db.competitor.update({
         where: { id: competitor.id },
         data: {
           lastCrawledAt: new Date(),
+          consecutiveFailures: 0, // Reset on successful crawl
         },
       });
     } catch (error) {
