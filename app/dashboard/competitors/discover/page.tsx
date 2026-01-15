@@ -14,6 +14,7 @@ export default function DiscoverCompetitorsPage() {
   const [loadingBusiness, setLoadingBusiness] = useState(true);
   const [competitorLimit, setCompetitorLimit] = useState<number>(3);
   const [currentCount, setCurrentCount] = useState<number>(0);
+  const [existingUrls, setExistingUrls] = useState<string[]>([]);
 
   useEffect(() => {
     loadBusinessData();
@@ -21,10 +22,11 @@ export default function DiscoverCompetitorsPage() {
 
   const loadBusinessData = async () => {
     try {
-      const [businessRes, limitRes, userRes] = await Promise.all([
-        fetch('/api/business'),
-        fetch('/api/subscription/limit'),
-        fetch('/api/user/profile'),
+      const [businessRes, limitRes, userRes, competitorsRes] = await Promise.all([
+        fetch('/api/business', { cache: 'no-store' }),
+        fetch('/api/subscription/limit', { cache: 'no-store' }),
+        fetch('/api/user/profile', { cache: 'no-store' }),
+        fetch('/api/competitors', { cache: 'no-store' }),
       ]);
 
       if (businessRes.ok) {
@@ -34,8 +36,8 @@ export default function DiscoverCompetitorsPage() {
 
       if (limitRes.ok) {
         const limitData = await limitRes.json();
-        setCompetitorLimit(limitData.competitorLimit || 3);
-        setCurrentCount(limitData.currentCount || 0);
+        setCompetitorLimit(limitData.competitorLimit ?? 3);
+        setCurrentCount(limitData.currentCount ?? 0);
       }
 
       if (userRes.ok) {
@@ -44,6 +46,12 @@ export default function DiscoverCompetitorsPage() {
           city: userProfile.city || undefined,
           state: userProfile.state || undefined,
         });
+      }
+
+      if (competitorsRes.ok) {
+        const competitorsData = await competitorsRes.json();
+        const urls = (competitorsData.competitors || []).map((c: any) => c.url?.toLowerCase());
+        setExistingUrls(urls.filter(Boolean));
       }
     } catch (err) {
       console.error('Failed to load business data:', err);
@@ -92,7 +100,7 @@ export default function DiscoverCompetitorsPage() {
 
     for (const comp of competitors) {
       try {
-        const res = await fetch('/api/onboarding/competitor', {
+        const res = await fetch('/api/competitors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -106,9 +114,10 @@ export default function DiscoverCompetitorsPage() {
         } else {
           const errData = await res.json();
 
-          // If limit reached, show error and stop
+          // Handle specific error cases
           if (res.status === 403) {
-            setError(errData.error || 'Competitor limit reached');
+            // Limit reached or industry validation failed - stop processing
+            setError(errData.error || 'Unable to add competitor');
             setLoading(false);
             if (added.length > 0) {
               setAddedCompetitors(added);
@@ -116,15 +125,28 @@ export default function DiscoverCompetitorsPage() {
             return;
           }
 
-          failed.push({ ...comp, error: errData.error });
+          if (res.status === 409) {
+            // Duplicate competitor - continue with others
+            failed.push({ ...comp, error: errData.error || 'Already monitoring this competitor' });
+          } else {
+            // Other errors (400, 404, 500)
+            failed.push({ ...comp, error: errData.error || 'Failed to add competitor' });
+          }
         }
       } catch (err) {
-        failed.push({ ...comp, error: 'Network error' });
+        failed.push({ ...comp, error: 'Network error - please try again' });
       }
     }
 
     setLoading(false);
     setAddedCompetitors(added);
+
+    // Show error if some competitors failed but not all
+    if (failed.length > 0 && added.length > 0) {
+      setError(`Added ${added.length} competitor(s). ${failed.length} failed: ${failed.map(f => f.name).join(', ')}`);
+    } else if (failed.length > 0 && added.length === 0) {
+      setError(`Failed to add competitors: ${failed.map(f => `${f.name} (${f.error})`).join(', ')}`);
+    }
 
     if (added.length > 0) {
       // Show success and redirect after 2 seconds
@@ -151,12 +173,45 @@ export default function DiscoverCompetitorsPage() {
           </p>
         </div>
 
+        {/* Limit Warning Banner */}
+        {!loadingBusiness && currentCount >= competitorLimit && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-amber-800 font-medium">
+                  You&apos;ve reached your competitor limit ({currentCount}/{competitorLimit})
+                </p>
+                <p className="text-amber-700 text-sm mt-1">
+                  To add new competitors, you&apos;ll need to remove existing ones or upgrade your plan.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => router.push('/dashboard/competitors')}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+                  >
+                    Manage Competitors
+                  </button>
+                  <button
+                    onClick={() => router.push('/dashboard/subscription')}
+                    className="px-4 py-2 border border-amber-600 text-amber-700 rounded-lg hover:bg-amber-100 text-sm font-medium"
+                  >
+                    Upgrade Plan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800 font-medium">{error}</p>
-            {addedCompetitors.length > 0 && (
+            {addedCompetitors.length > 0 && !error.includes('Added') && (
               <p className="text-red-600 text-sm mt-2">
-                Successfully added {addedCompetitors.length} competitor(s) before reaching limit
+                Successfully added {addedCompetitors.length} competitor(s) before the error occurred.
               </p>
             )}
           </div>
@@ -197,6 +252,7 @@ export default function DiscoverCompetitorsPage() {
             <CompetitorDiscovery
               onComplete={handleDiscoveryComplete}
               onSkip={handleSkip}
+              onManageCompetitors={() => router.push('/dashboard/competitors')}
               initialIndustry={businessData?.industry || ''}
               initialCity={businessData?.city || (businessData?.location ? parseLocation(businessData.location).city : '')}
               initialState={businessData?.state || (businessData?.location ? parseLocation(businessData.location).state : '')}
@@ -204,6 +260,7 @@ export default function DiscoverCompetitorsPage() {
               maxSelectable={Math.max(0, competitorLimit - currentCount)}
               userCity={userData?.city}
               userState={userData?.state}
+              existingUrls={existingUrls}
             />
           )}
         </div>

@@ -3,6 +3,45 @@
 import { useState } from 'react';
 import Link from 'next/link';
 
+// Constants defined outside component - single source of truth
+const COMMON_INDUSTRIES = [
+  'Restaurant / Food Service',
+  'Coffee Shop / Cafe',
+  'Pizza Restaurant',
+  'Fast Food',
+  'Bar / Pub',
+  'Bakery',
+  'Hair Salon / Barber',
+  'Nail Salon',
+  'Spa / Wellness',
+  'Gym / Fitness Center',
+  'Yoga Studio',
+  'Retail Store',
+  'Clothing Boutique',
+  'Bookstore',
+  'Pet Store',
+  'Hardware Store',
+  'Auto Repair',
+  'Car Wash',
+  'Dental Office',
+  'Medical Clinic',
+  'Veterinary Clinic',
+  'Real Estate Agency',
+  'Law Firm',
+  'Accounting Services',
+  'Marketing Agency',
+  'Consulting',
+  'Other',
+] as const;
+
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+] as const;
+
 interface Competitor {
   name: string;
   website: string;
@@ -13,6 +52,7 @@ interface Competitor {
 interface CompetitorDiscoveryProps {
   onComplete: (selectedCompetitors: Competitor[]) => void;
   onSkip: () => void;
+  onManageCompetitors?: () => void;
   initialIndustry?: string;
   initialCity?: string;
   initialState?: string;
@@ -20,11 +60,13 @@ interface CompetitorDiscoveryProps {
   maxSelectable?: number;
   userCity?: string;
   userState?: string;
+  existingUrls?: string[];
 }
 
 export default function CompetitorDiscovery({
   onComplete,
   onSkip,
+  onManageCompetitors,
   initialIndustry = '',
   initialCity = '',
   initialState = '',
@@ -32,6 +74,7 @@ export default function CompetitorDiscovery({
   maxSelectable = 999,
   userCity = '',
   userState = '',
+  existingUrls = [],
 }: CompetitorDiscoveryProps) {
   // Form state
   const [industry, setIndustry] = useState(initialIndustry);
@@ -40,9 +83,10 @@ export default function CompetitorDiscovery({
   const [state, setState] = useState(initialState);
   const [zipcode, setZipcode] = useState(initialZipcode);
 
-  // Validation helpers
-  const effectiveIndustry = industry === 'Other' ? customIndustry.trim() : industry.trim();
-  const isIndustryValid = effectiveIndustry.length > 0;
+  // Validation helpers - industry must be a valid selection from the list
+  const isIndustrySelected = industry !== '' && (COMMON_INDUSTRIES as readonly string[]).includes(industry);
+  const isCustomIndustryValid = industry === 'Other' && customIndustry.trim().length > 0;
+  const isIndustryValid = isIndustrySelected && (industry !== 'Other' || isCustomIndustryValid);
   const isCityValid = city.trim().length > 0;
   const isStateValid = state.length === 2;
   const isFormValid = isIndustryValid && isCityValid && isStateValid;
@@ -60,6 +104,12 @@ export default function CompetitorDiscovery({
   const [showResults, setShowResults] = useState(false);
 
   const handleDiscover = async () => {
+    // Double-check validation before proceeding
+    if (!isFormValid) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -98,15 +148,36 @@ export default function CompetitorDiscovery({
         if (data.trackingError) {
           setError(data.trackingError);
         }
-        setCompetitors(data.competitors);
-        setShowResults(true);
 
-        // Auto-select top 2-3 competitors
-        const autoSelect = new Set<number>();
-        for (let i = 0; i < Math.min(3, data.competitors.length); i++) {
-          autoSelect.add(i);
+        // Filter out competitors user already has
+        const newCompetitors = data.competitors.filter((comp: Competitor) => {
+          const compUrl = comp.website?.toLowerCase().replace(/\/$/, '');
+          return !existingUrls.some(url => {
+            const existingUrl = url.replace(/\/$/, '');
+            return compUrl === existingUrl || compUrl?.includes(existingUrl) || existingUrl.includes(compUrl || '');
+          });
+        });
+
+        if (newCompetitors.length === 0) {
+          setError('All discovered competitors are already in your profile.');
+          setCompetitors([]);
+          setShowResults(false);
+        } else {
+          const filteredCount = data.competitors.length - newCompetitors.length;
+          if (filteredCount > 0) {
+            setError(`${filteredCount} competitor(s) already in your profile were filtered out.`);
+          }
+          setCompetitors(newCompetitors);
+          setShowResults(true);
+
+          // Auto-select top competitors (up to 3, but respecting maxSelectable)
+          const autoSelect = new Set<number>();
+          const autoSelectCount = Math.min(3, newCompetitors.length, maxSelectable);
+          for (let i = 0; i < autoSelectCount; i++) {
+            autoSelect.add(i);
+          }
+          setSelected(autoSelect);
         }
-        setSelected(autoSelect);
       }
     } catch (err: any) {
       console.error('Discovery error:', err);
@@ -159,46 +230,6 @@ export default function CompetitorDiscovery({
     setError('');
   };
 
-  // Common industries
-  const commonIndustries = [
-    'Restaurant / Food Service',
-    'Coffee Shop / Cafe',
-    'Pizza Restaurant',
-    'Fast Food',
-    'Bar / Pub',
-    'Bakery',
-    'Hair Salon / Barber',
-    'Nail Salon',
-    'Spa / Wellness',
-    'Gym / Fitness Center',
-    'Yoga Studio',
-    'Retail Store',
-    'Clothing Boutique',
-    'Bookstore',
-    'Pet Store',
-    'Hardware Store',
-    'Auto Repair',
-    'Car Wash',
-    'Dental Office',
-    'Medical Clinic',
-    'Veterinary Clinic',
-    'Real Estate Agency',
-    'Law Firm',
-    'Accounting Services',
-    'Marketing Agency',
-    'Consulting',
-    'Other',
-  ];
-
-  // Common states (US)
-  const states = [
-    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
-  ];
-
   return (
     <div className="max-w-3xl mx-auto">
       {/* Header */}
@@ -225,16 +256,21 @@ export default function CompetitorDiscovery({
             {/* Industry */}
             <div>
               <label htmlFor="industry" className="block text-sm font-medium text-gray-900 mb-2">
-                Industry / Business Type *
+                Industry / Business Type <span className="text-red-500">*</span>
               </label>
               <select
                 id="industry"
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                required
+                aria-required="true"
+                aria-invalid={!isIndustryValid}
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base ${
+                  !isIndustryValid ? 'border-gray-300' : 'border-gray-300'
+                }`}
               >
                 <option value="">Select your industry</option>
-                {commonIndustries.map((ind) => (
+                {COMMON_INDUSTRIES.map((ind) => (
                   <option key={ind} value={ind}>
                     {ind}
                   </option>
@@ -246,6 +282,8 @@ export default function CompetitorDiscovery({
                   value={customIndustry}
                   onChange={(e) => setCustomIndustry(e.target.value)}
                   placeholder="Enter your specific industry"
+                  required
+                  aria-required="true"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base mt-3"
                 />
               )}
@@ -258,7 +296,7 @@ export default function CompetitorDiscovery({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-2">
-                  City *
+                  City <span className="text-red-500">*</span>
                 </label>
                 <input
                   id="city"
@@ -266,22 +304,28 @@ export default function CompetitorDiscovery({
                   value={city}
                   onChange={(e) => setCity(e.target.value)}
                   placeholder="Austin"
+                  required
+                  aria-required="true"
+                  aria-invalid={!isCityValid}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
                 />
               </div>
 
               <div>
                 <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-2">
-                  State *
+                  State <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="state"
                   value={state}
                   onChange={(e) => setState(e.target.value)}
+                  required
+                  aria-required="true"
+                  aria-invalid={!isStateValid}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
                 >
                   <option value="">Select State</option>
-                  {states.map((st) => (
+                  {US_STATES.map((st) => (
                     <option key={st} value={st}>
                       {st}
                     </option>
@@ -298,8 +342,13 @@ export default function CompetitorDiscovery({
               <input
                 id="zipcode"
                 type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={zipcode}
-                onChange={(e) => setZipcode(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setZipcode(value);
+                }}
                 placeholder="78701"
                 maxLength={5}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
@@ -368,9 +417,15 @@ export default function CompetitorDiscovery({
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 pt-4">
               <button
+                type="button"
                 onClick={handleDiscover}
                 disabled={loading || !isFormValid}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors inline-flex items-center justify-center gap-2"
+                aria-disabled={loading || !isFormValid}
+                className={`w-full py-3 rounded-lg font-medium transition-colors inline-flex items-center justify-center gap-2 ${
+                  loading || !isFormValid
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
                 {loading ? (
                   <>
@@ -399,6 +454,18 @@ export default function CompetitorDiscovery({
       {/* Results */}
       {showResults && competitors.length > 0 && (
         <div className="space-y-6">
+          {/* At Limit Warning */}
+          {maxSelectable === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-800 font-medium">
+                You&apos;ve reached your competitor limit
+              </p>
+              <p className="text-amber-700 text-sm mt-1">
+                Remove existing competitors or upgrade your plan to add these.
+              </p>
+            </div>
+          )}
+
           {/* Results Header */}
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between">
@@ -407,15 +474,19 @@ export default function CompetitorDiscovery({
                   We found {competitors.length} competitors
                 </p>
                 <p className="text-sm text-gray-600">
-                  Select the ones you want to monitor
+                  {maxSelectable > 0
+                    ? `Select up to ${maxSelectable} to monitor`
+                    : 'View potential competitors in your area'}
                 </p>
               </div>
-              <button
-                onClick={handleSelectAll}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {selected.size === competitors.length ? 'Deselect All' : 'Select All'}
-              </button>
+              {maxSelectable > 0 && (
+                <button
+                  onClick={handleSelectAll}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  {selected.size === Math.min(competitors.length, maxSelectable) ? 'Deselect All' : 'Select All'}
+                </button>
+              )}
             </div>
           </div>
 
@@ -424,21 +495,25 @@ export default function CompetitorDiscovery({
             {competitors.map((comp, index) => (
               <div
                 key={index}
-                onClick={() => handleToggleSelect(index)}
-                className={`bg-white border rounded-lg p-4 md:p-5 cursor-pointer transition-all ${
-                  selected.has(index)
-                    ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200'
-                    : 'border-gray-200 hover:bg-gray-50'
+                onClick={() => maxSelectable > 0 && handleToggleSelect(index)}
+                className={`bg-white border rounded-lg p-4 md:p-5 transition-all ${
+                  maxSelectable === 0
+                    ? 'border-gray-200 opacity-75'
+                    : selected.has(index)
+                    ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200 cursor-pointer'
+                    : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={selected.has(index)}
-                    onChange={() => {}}
-                    className="w-5 h-5 mt-1 text-blue-600 rounded focus:ring-blue-500"
-                  />
+                  {/* Checkbox - hidden when at limit */}
+                  {maxSelectable > 0 && (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(index)}
+                      onChange={() => {}}
+                      className="w-5 h-5 mt-1 text-blue-600 rounded focus:ring-blue-500"
+                    />
+                  )}
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
@@ -492,13 +567,22 @@ export default function CompetitorDiscovery({
               ← Back
             </button>
 
-            <button
-              onClick={handleContinue}
-              disabled={selected.size === 0}
-              className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
-            >
-              Continue with {selected.size} competitor{selected.size !== 1 ? 's' : ''} →
-            </button>
+            {maxSelectable > 0 ? (
+              <button
+                onClick={handleContinue}
+                disabled={selected.size === 0}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+              >
+                Continue with {selected.size} competitor{selected.size !== 1 ? 's' : ''} →
+              </button>
+            ) : (
+              <button
+                onClick={onManageCompetitors || onSkip}
+                className="flex-1 py-3 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition-colors"
+              >
+                Manage Existing Competitors →
+              </button>
+            )}
           </div>
         </div>
       )}
