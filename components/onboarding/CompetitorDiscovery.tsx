@@ -441,10 +441,14 @@ export default function CompetitorDiscovery({
               </button>
 
               <button
-                onClick={onSkip}
-                className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                onClick={maxSelectable > 0 ? onSkip : onManageCompetitors}
+                className={`w-full px-6 py-3 border rounded-lg font-medium transition-colors ${
+                  maxSelectable > 0
+                    ? 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    : 'border-amber-300 text-amber-700 hover:bg-amber-50'
+                }`}
               >
-                Skip - Add Manually
+                {maxSelectable > 0 ? 'Skip - Add Manually' : 'Manage Existing Competitors'}
               </button>
             </div>
           </div>

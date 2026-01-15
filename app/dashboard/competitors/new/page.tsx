@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function NewCompetitorPage() {
@@ -10,6 +10,9 @@ export default function NewCompetitorPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [competitorLimit, setCompetitorLimit] = useState<number>(3);
+  const [currentCount, setCurrentCount] = useState<number>(0);
+  const [loadingLimit, setLoadingLimit] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -18,6 +21,33 @@ export default function NewCompetitorPage() {
     isActive: true,
   });
 
+  // Validation helpers
+  const isNameValid = formData.name.trim().length >= 2;
+  // Simple URL validation - just needs to have a dot and some characters
+  const urlTrimmed = formData.url.trim();
+  const isUrlValid = urlTrimmed.length > 3 && urlTrimmed.includes('.') && !urlTrimmed.includes(' ');
+  const isAtLimit = currentCount >= competitorLimit;
+  const isFormValid = isNameValid && isUrlValid && !isAtLimit;
+
+  // Fetch limit data
+  useEffect(() => {
+    const fetchLimitData = async () => {
+      try {
+        const res = await fetch('/api/subscription/limit', { cache: 'no-store' });
+        if (res.ok) {
+          const data = await res.json();
+          setCompetitorLimit(data.competitorLimit ?? 3);
+          setCurrentCount(data.currentCount ?? 0);
+        }
+      } catch (err) {
+        console.error('Failed to fetch limit data:', err);
+      } finally {
+        setLoadingLimit(false);
+      }
+    };
+    fetchLimitData();
+  }, []);
+
   // Redirect if not authenticated
   if (status === 'unauthenticated') {
     router.push('/auth/signin');
@@ -25,14 +55,36 @@ export default function NewCompetitorPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate before submission
+    if (!isFormValid) {
+      if (isAtLimit) {
+        setError('You have reached your competitor limit. Please remove existing competitors or upgrade your plan.');
+      } else if (!isNameValid) {
+        setError('Please enter a valid competitor name (at least 2 characters).');
+      } else if (!isUrlValid) {
+        setError('Please enter a website address (e.g., competitor.com).');
+      }
+      return;
+    }
+
     setLoading(true);
     setError('');
+
+    // Normalize URL - add https:// if missing
+    let normalizedUrl = formData.url.trim();
+    if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+      normalizedUrl = 'https://' + normalizedUrl;
+    }
 
     try {
       const res = await fetch('/api/competitors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          url: normalizedUrl,
+        }),
       });
 
       if (!res.ok) {
@@ -78,6 +130,41 @@ export default function NewCompetitorPage() {
             Enter details about the competitor you want to monitor
           </p>
 
+          {/* Limit Warning */}
+          {!loadingLimit && isAtLimit && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-amber-800 font-medium">
+                    You&apos;ve reached your competitor limit ({currentCount}/{competitorLimit})
+                  </p>
+                  <p className="text-amber-700 text-sm mt-1">
+                    Remove existing competitors or upgrade your plan to add more.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard/competitors')}
+                      className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 text-sm font-medium"
+                    >
+                      Manage Competitors
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push('/dashboard/subscription')}
+                      className="px-4 py-2 border border-amber-600 text-amber-700 rounded-lg hover:bg-amber-100 text-sm font-medium"
+                    >
+                      Upgrade Plan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
@@ -91,7 +178,7 @@ export default function NewCompetitorPage() {
             {/* Competitor Name */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-900 mb-2">
-                Competitor Name *
+                Competitor Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -103,28 +190,42 @@ export default function NewCompetitorPage() {
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="e.g., Acme Coffee Shop"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                aria-invalid={formData.name.length > 0 && !isNameValid}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  formData.name.length > 0 && !isNameValid
+                    ? 'border-red-300'
+                    : 'border-gray-300'
+                }`}
               />
-              <p className="text-xs text-gray-600 mt-1">
-                Give your competitor a recognizable name
+              <p className={`text-xs mt-1 ${formData.name.length > 0 && !isNameValid ? 'text-red-600' : 'text-gray-600'}`}>
+                {formData.name.length > 0 && !isNameValid
+                  ? 'Name must be at least 2 characters'
+                  : 'Give your competitor a recognizable name'}
               </p>
             </div>
 
             {/* Website URL */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-900 mb-2">
-                Website URL *
+                Website URL <span className="text-red-500">*</span>
               </label>
               <input
-                type="url"
+                type="text"
                 required
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 placeholder="https://competitor.com or competitor.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                aria-invalid={formData.url.length > 0 && !isUrlValid}
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  formData.url.length > 0 && !isUrlValid
+                    ? 'border-red-300'
+                    : 'border-gray-300'
+                }`}
               />
-              <p className="text-xs text-gray-600 mt-1">
-                We&apos;ll monitor this URL for pricing and content changes
+              <p className={`text-xs mt-1 ${formData.url.length > 0 && !isUrlValid ? 'text-red-600' : 'text-gray-600'}`}>
+                {formData.url.length > 0 && !isUrlValid
+                  ? 'Enter a website address (e.g., competitor.com)'
+                  : 'We\'ll monitor this URL for pricing and content changes'}
               </p>
             </div>
 
@@ -185,10 +286,14 @@ export default function NewCompetitorPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                disabled={loading || !isFormValid || loadingLimit}
+                className={`flex-1 px-4 py-3 rounded-lg transition-colors font-medium ${
+                  loading || !isFormValid || loadingLimit
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
               >
-                {loading ? 'Adding...' : 'Add Competitor'}
+                {loading ? 'Adding...' : isAtLimit ? 'Limit Reached' : 'Add Competitor'}
               </button>
             </div>
           </form>
