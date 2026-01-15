@@ -20,6 +20,20 @@ type TrialSubscription = {
     createdAt: Date;
   };
 };
+
+type PaidSubscription = {
+  id: number;
+  userId: number;
+  status: string;
+  stripeSubscriptionId: string;
+  stripePriceId: string;
+  currentPeriodStart: Date;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  competitorLimit: number;
+  createdAt: Date;
+  updatedAt: Date;
+};
 /**
  * GET /api/admin/analytics/trial-conversion
  * Get trial conversion analytics
@@ -70,31 +84,31 @@ export async function GET(request: NextRequest) {
     }) as unknown as TrialSubscription[];
 
     // Get paid subscriptions for users who had trials
-    const userIds = allTrials.map((t) => t.userId);
+    const userIds = allTrials.map((t: TrialSubscription) => t.userId);
     const paidSubscriptions = await db.subscription.findMany({
       where: {
         userId: { in: userIds },
         stripePriceId: { not: 'trial' },
         status: { in: ['active', 'trialing'] },
       },
-    });
+    }) as unknown as PaidSubscription[];
 
     // Calculate conversion metrics
     const totalTrials = allTrials.length;
-    const convertedTrials = new Set(paidSubscriptions.map((s) => s.userId)).size;
+    const convertedTrials = new Set(paidSubscriptions.map((s: PaidSubscription) => s.userId)).size;
     const conversionRate = totalTrials > 0 ? (convertedTrials / totalTrials) * 100 : 0;
 
     // Calculate status breakdown
     const statusBreakdown = {
-      trialing: allTrials.filter((t) => t.status === 'trialing').length,
-      grace_period: allTrials.filter((t) => t.status === 'grace_period').length,
-      expired: allTrials.filter((t) => t.status === 'expired').length,
+      trialing: allTrials.filter((t: TrialSubscription) => t.status === 'trialing').length,
+      grace_period: allTrials.filter((t: TrialSubscription) => t.status === 'grace_period').length,
+      expired: allTrials.filter((t: TrialSubscription) => t.status === 'expired').length,
       converted: convertedTrials,
     };
 
     // Calculate time to conversion
-    const conversions = paidSubscriptions.map((paid) => {
-      const trial = allTrials.find((t) => t.userId === paid.userId);
+    const conversions = paidSubscriptions.map((paid: PaidSubscription) => {
+      const trial = allTrials.find((t: TrialSubscription) => t.userId === paid.userId);
       if (!trial) return null;
 
       const trialStart = new Date(trial.createdAt);
@@ -119,7 +133,7 @@ export async function GET(request: NextRequest) {
 
     // Get conversion funnel stats
     const now = new Date();
-    const trialsExpiringSoon = allTrials.filter((t) => {
+    const trialsExpiringSoon = allTrials.filter((t: TrialSubscription) => {
       if (t.status !== 'trialing') return false;
       const daysRemaining = Math.ceil(
         (new Date(t.currentPeriodEnd).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
