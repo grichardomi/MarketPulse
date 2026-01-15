@@ -15,6 +15,14 @@ export async function enqueueJobs(): Promise<SchedulerResult> {
   console.log('Starting scheduler...');
 
   try {
+    // Clean up failed jobs (reached max attempts) to unblock competitors
+    const cleanedUp = await db.$executeRaw`
+      DELETE FROM "CrawlQueue" WHERE attempt >= "maxAttempts"
+    `;
+    if (cleanedUp > 0) {
+      console.log(`Cleaned up ${cleanedUp} failed jobs`);
+    }
+
     const gracePeriodDays = TRIAL_CONFIG.gracePeriodDays;
 
     // Find active competitors that are due for crawling
