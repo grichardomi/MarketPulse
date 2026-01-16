@@ -7,32 +7,21 @@
 
 import { PrismaClient } from '@prisma/client';
 
-// Tables with auto-increment id columns (all models with @id @default(autoincrement()))
-const TABLES_WITH_SEQUENCES = [
-  'Account',
-  'Alert',
-  'Business',
-  'Competitor',
-  'CompetitorDiscoveryCache',
-  'CrawlQueue',
-  'DiscoveryEvent',
-  'EmailQueue',
-  'NotificationPreferences',
-  'Payment',
-  'PriceSnapshot',
-  'PushSubscription',
-  'Session',
-  'SmsQueue',
-  'Subscription',
-  'SupportTicket',
-  'SupportTicketMessage',
-  'User',
-  'WebhookDelivery',
-  'WebhookDestination',
-  'WebhookEvent',
-];
-
 let hasRun = false;
+
+/**
+ * Get all tables that actually exist in the database and have id sequences
+ */
+async function getTablesWithSequences(prisma: PrismaClient): Promise<string[]> {
+  const result = await prisma.$queryRawUnsafe<{ tablename: string }[]>(`
+    SELECT t.tablename
+    FROM pg_tables t
+    INNER JOIN pg_sequences s ON s.sequencename = t.tablename || '_id_seq'
+    WHERE t.schemaname = 'public'
+      AND s.schemaname = 'public'
+  `);
+  return result.map((r) => r.tablename);
+}
 
 /**
  * Check and fix a single table's sequence if out of sync
@@ -98,9 +87,11 @@ export async function fixSequencesOnStartup(prisma: PrismaClient): Promise<void>
   hasRun = true;
 
   try {
+    // Only check tables that actually exist in the database
+    const tables = await getTablesWithSequences(prisma);
     let fixedCount = 0;
 
-    for (const table of TABLES_WITH_SEQUENCES) {
+    for (const table of tables) {
       const result = await checkAndFixSequence(prisma, table);
       if (result.fixed) {
         fixedCount++;
