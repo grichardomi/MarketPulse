@@ -7,8 +7,9 @@
 
 import { PrismaClient } from '@prisma/client';
 
-// Tables with auto-increment id columns
+// Tables with auto-increment id columns (all models with @id @default(autoincrement()))
 const TABLES_WITH_SEQUENCES = [
+  'Account',
   'Alert',
   'Business',
   'Competitor',
@@ -23,6 +24,8 @@ const TABLES_WITH_SEQUENCES = [
   'Session',
   'SmsQueue',
   'Subscription',
+  'SupportTicket',
+  'SupportTicketMessage',
   'User',
   'WebhookDelivery',
   'WebhookDestination',
