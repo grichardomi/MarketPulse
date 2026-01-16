@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { INDUSTRY_METADATA, type Industry } from '@/lib/config/industries';
 
 // Constants defined outside component - single source of truth
 const COMMON_INDUSTRIES = [
@@ -33,6 +34,12 @@ const COMMON_INDUSTRIES = [
   'Consulting',
   'Other',
 ] as const;
+
+// Helper to get industry label from enum value
+function getIndustryLabel(industryValue: string): string | null {
+  const metadata = INDUSTRY_METADATA[industryValue as Industry];
+  return metadata?.label || null;
+}
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
@@ -76,17 +83,26 @@ export default function CompetitorDiscovery({
   userState = '',
   existingUrls = [],
 }: CompetitorDiscoveryProps) {
-  // Form state
-  const [industry, setIndustry] = useState(initialIndustry);
+  // Check if industry was passed from previous screen (as an Industry enum value)
+  const prefilledIndustryLabel = initialIndustry ? getIndustryLabel(initialIndustry) : null;
+  const hasPrefilledIndustry = !!prefilledIndustryLabel;
+
+  // Check if location was passed from previous screen
+  const hasPrefilledLocation = !!(initialCity && initialState && initialState.length === 2);
+
+  // Form state - use the label if we have a prefilled industry, otherwise empty for manual selection
+  const [industry, setIndustry] = useState(
+    hasPrefilledIndustry ? prefilledIndustryLabel : (initialIndustry || '')
+  );
   const [customIndustry, setCustomIndustry] = useState('');
   const [city, setCity] = useState(initialCity);
   const [state, setState] = useState(initialState);
   const [zipcode, setZipcode] = useState(initialZipcode);
 
-  // Validation helpers - industry must be a valid selection from the list
-  const isIndustrySelected = industry !== '' && (COMMON_INDUSTRIES as readonly string[]).includes(industry);
+  // Validation helpers - industry is valid if prefilled OR if a valid selection from the list
+  const isIndustrySelected = hasPrefilledIndustry || (industry !== '' && (COMMON_INDUSTRIES as readonly string[]).includes(industry));
   const isCustomIndustryValid = industry === 'Other' && customIndustry.trim().length > 0;
-  const isIndustryValid = isIndustrySelected && (industry !== 'Other' || isCustomIndustryValid);
+  const isIndustryValid = hasPrefilledIndustry || (isIndustrySelected && (industry !== 'Other' || isCustomIndustryValid));
   const isCityValid = city.trim().length > 0;
   const isStateValid = state.length === 2;
   const isFormValid = isIndustryValid && isCityValid && isStateValid;
@@ -253,113 +269,150 @@ export default function CompetitorDiscovery({
       {!showResults && (
         <div className="bg-white rounded-lg border border-gray-200 p-6 md:p-8 mb-6">
           <div className="space-y-6">
-            {/* Industry */}
-            <div>
-              <label htmlFor="industry" className="block text-sm font-medium text-gray-900 mb-2">
-                Industry / Business Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="industry"
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                required
-                aria-required="true"
-                aria-invalid={!isIndustryValid}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base ${
-                  !isIndustryValid ? 'border-gray-300' : 'border-gray-300'
-                }`}
-              >
-                <option value="">Select your industry</option>
-                {COMMON_INDUSTRIES.map((ind) => (
-                  <option key={ind} value={ind}>
-                    {ind}
-                  </option>
-                ))}
-              </select>
-              {industry === 'Other' && (
-                <input
-                  type="text"
-                  value={customIndustry}
-                  onChange={(e) => setCustomIndustry(e.target.value)}
-                  placeholder="Enter your specific industry"
-                  required
-                  aria-required="true"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base mt-3"
-                />
-              )}
-              <p className="mt-1 text-sm text-gray-500">
-                Select the category that best matches your business
-              </p>
-            </div>
-
-            {/* Location Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-2">
-                  City <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="city"
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Austin"
-                  required
-                  aria-required="true"
-                  aria-invalid={!isCityValid}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
-                />
+            {/* At Limit Warning - show when user can't add more competitors */}
+            {maxSelectable === 0 && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="font-medium text-amber-800">
+                  You&apos;ve reached your competitor limit
+                </p>
+                <p className="text-sm text-amber-700 mt-1">
+                  To add new competitors, remove existing ones or upgrade your plan.
+                </p>
               </div>
+            )}
 
+            {/* Industry - show as read-only if prefilled from previous screen */}
+            {hasPrefilledIndustry ? (
               <div>
-                <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-2">
-                  State <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Industry / Business Type
+                </label>
+                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-base text-gray-700">
+                  {industry}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="industry" className="block text-sm font-medium text-gray-900 mb-2">
+                  Industry / Business Type <span className="text-red-500">*</span>
                 </label>
                 <select
-                  id="state"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
+                  id="industry"
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
                   required
                   aria-required="true"
-                  aria-invalid={!isStateValid}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                  aria-invalid={!isIndustryValid}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base ${
+                    !isIndustryValid ? 'border-gray-300' : 'border-gray-300'
+                  }`}
                 >
-                  <option value="">Select State</option>
-                  {US_STATES.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
+                  <option value="">Select your industry</option>
+                  {COMMON_INDUSTRIES.map((ind) => (
+                    <option key={ind} value={ind}>
+                      {ind}
                     </option>
                   ))}
                 </select>
+                {industry === 'Other' && (
+                  <input
+                    type="text"
+                    value={customIndustry}
+                    onChange={(e) => setCustomIndustry(e.target.value)}
+                    placeholder="Enter your specific industry"
+                    required
+                    aria-required="true"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base mt-3"
+                  />
+                )}
+                <p className="mt-1 text-sm text-gray-500">
+                  Select the category that best matches your business
+                </p>
               </div>
-            </div>
+            )}
 
-            {/* Zipcode (Optional) */}
-            <div>
-              <label htmlFor="zipcode" className="block text-sm font-medium text-gray-900 mb-2">
-                Zipcode (optional)
-              </label>
-              <input
-                id="zipcode"
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={zipcode}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, '');
-                  setZipcode(value);
-                }}
-                placeholder="78701"
-                maxLength={5}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                For more precise results in your specific area
-              </p>
-            </div>
+            {/* Location - show as read-only if prefilled from previous screen */}
+            {hasPrefilledLocation ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Location
+                </label>
+                <div className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-base text-gray-700">
+                  {city}, {state}{zipcode ? ` ${zipcode}` : ''}
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Location Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-900 mb-2">
+                      City <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="city"
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Austin"
+                      required
+                      aria-required="true"
+                      aria-invalid={!isCityValid}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                    />
+                  </div>
 
-            {/* Location Mismatch Warning */}
-            {locationMismatch && city && state && (
+                  <div>
+                    <label htmlFor="state" className="block text-sm font-medium text-gray-900 mb-2">
+                      State <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="state"
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      required
+                      aria-required="true"
+                      aria-invalid={!isStateValid}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                    >
+                      <option value="">Select State</option>
+                      {US_STATES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Zipcode (Optional) */}
+                <div>
+                  <label htmlFor="zipcode" className="block text-sm font-medium text-gray-900 mb-2">
+                    Zipcode (optional)
+                  </label>
+                  <input
+                    id="zipcode"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={zipcode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      setZipcode(value);
+                    }}
+                    placeholder="78701"
+                    maxLength={5}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-base"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    For more precise results in your specific area
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Location Mismatch Warning - only show when location is editable */}
+            {!hasPrefilledLocation && locationMismatch && city && state && (
               <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                 <div className="flex items-start gap-3">
                   <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -381,64 +434,74 @@ export default function CompetitorDiscovery({
               </div>
             )}
 
-            {/* Validation Summary */}
+            {/* Validation Summary - only show when there are incomplete fields */}
             {!isFormValid && !loading && (
               <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                 <p className="text-sm font-medium text-gray-700 mb-2">Required fields:</p>
                 <ul className="text-sm space-y-1">
-                  <li className={`flex items-center gap-2 ${isIndustryValid ? 'text-green-600' : 'text-gray-500'}`}>
-                    {isIndustryValid ? (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
-                    )}
-                    Industry / Business Type
-                  </li>
-                  <li className={`flex items-center gap-2 ${isCityValid ? 'text-green-600' : 'text-gray-500'}`}>
-                    {isCityValid ? (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
-                    )}
-                    City
-                  </li>
-                  <li className={`flex items-center gap-2 ${isStateValid ? 'text-green-600' : 'text-gray-500'}`}>
-                    {isStateValid ? (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
-                    )}
-                    State
-                  </li>
+                  {/* Only show industry validation if not prefilled */}
+                  {!hasPrefilledIndustry && (
+                    <li className={`flex items-center gap-2 ${isIndustryValid ? 'text-green-600' : 'text-gray-500'}`}>
+                      {isIndustryValid ? (
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                      )}
+                      Industry / Business Type
+                    </li>
+                  )}
+                  {/* Only show location validation if not prefilled */}
+                  {!hasPrefilledLocation && (
+                    <>
+                      <li className={`flex items-center gap-2 ${isCityValid ? 'text-green-600' : 'text-gray-500'}`}>
+                        {isCityValid ? (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                        )}
+                        City
+                      </li>
+                      <li className={`flex items-center gap-2 ${isStateValid ? 'text-green-600' : 'text-gray-500'}`}>
+                        {isStateValid ? (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3" /></svg>
+                        )}
+                        State
+                      </li>
+                    </>
+                  )}
                 </ul>
               </div>
             )}
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-3 pt-4">
-              <button
-                type="button"
-                onClick={handleDiscover}
-                disabled={loading || !isFormValid}
-                aria-disabled={loading || !isFormValid}
-                className={`w-full py-3 rounded-lg font-medium transition-colors inline-flex items-center justify-center gap-2 ${
-                  loading || !isFormValid
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Discovering...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔍</span>
-                    <span>Find Competitors</span>
-                  </>
-                )}
-              </button>
+              {maxSelectable > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDiscover}
+                  disabled={loading || !isFormValid}
+                  aria-disabled={loading || !isFormValid}
+                  className={`w-full py-3 rounded-lg font-medium transition-colors inline-flex items-center justify-center gap-2 ${
+                    loading || !isFormValid
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Discovering...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🔍</span>
+                      <span>Find Competitors</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={maxSelectable > 0 ? onSkip : onManageCompetitors}

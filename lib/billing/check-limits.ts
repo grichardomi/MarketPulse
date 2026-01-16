@@ -1,5 +1,8 @@
 import { db } from '@/lib/db/prisma';
 
+// Default free tier limit for users without a subscription
+const FREE_TIER_COMPETITOR_LIMIT = 3;
+
 /**
  * Check if user has reached their competitor limit
  */
@@ -8,9 +11,8 @@ export async function checkCompetitorLimit(userId: number) {
     where: { userId },
   });
 
-  if (!subscription) {
-    throw new Error('No subscription found');
-  }
+  // Use free tier limit if no subscription exists
+  const competitorLimit = subscription?.competitorLimit ?? FREE_TIER_COMPETITOR_LIMIT;
 
   const competitorCount = await db.competitor.count({
     where: {
@@ -20,20 +22,20 @@ export async function checkCompetitorLimit(userId: number) {
     },
   });
 
-  if (competitorCount >= subscription.competitorLimit) {
+  if (competitorCount >= competitorLimit) {
     return {
       allowed: false,
-      message: `You have reached your competitor limit of ${subscription.competitorLimit}. Upgrade your plan to add more competitors.`,
-      limit: subscription.competitorLimit,
+      message: `You have reached your competitor limit of ${competitorLimit}. Upgrade your plan to add more competitors.`,
+      limit: competitorLimit,
       current: competitorCount,
     };
   }
 
   return {
     allowed: true,
-    limit: subscription.competitorLimit,
+    limit: competitorLimit,
     current: competitorCount,
-    remaining: subscription.competitorLimit - competitorCount,
+    remaining: competitorLimit - competitorCount,
   };
 }
 
@@ -45,10 +47,6 @@ export async function getSubscriptionStatus(userId: number) {
     where: { userId },
   });
 
-  if (!subscription) {
-    return null;
-  }
-
   const competitorCount = await db.competitor.count({
     where: {
       Business: {
@@ -56,6 +54,19 @@ export async function getSubscriptionStatus(userId: number) {
       },
     },
   });
+
+  // Return free tier defaults if no subscription exists
+  if (!subscription) {
+    return {
+      status: 'free' as const,
+      plan: 'Free',
+      competitorLimit: FREE_TIER_COMPETITOR_LIMIT,
+      competitorsUsed: competitorCount,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      trialEnds: null,
+    };
+  }
 
   return {
     status: subscription.status,

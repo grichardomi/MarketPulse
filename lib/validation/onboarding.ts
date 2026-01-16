@@ -8,8 +8,12 @@ export const businessSchema = z.object({
   name: z.string()
     .min(2, 'Business name must be at least 2 characters')
     .max(100, 'Business name cannot exceed 100 characters'),
-  location: z.string()
-    .max(200, 'Location cannot exceed 200 characters')
+  city: z.string()
+    .max(100, 'City cannot exceed 100 characters')
+    .optional()
+    .default(''),
+  state: z.string()
+    .max(2, 'State must be a 2-letter code')
     .optional()
     .default(''),
   industry: z

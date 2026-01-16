@@ -17,7 +17,8 @@ type OnboardingStep = 1 | 2 | 3 | 4;
 
 interface BusinessData {
   name: string;
-  location: string;
+  city: string;
+  state: string;
   industry: Industry;
 }
 
@@ -40,7 +41,8 @@ export default function OnboardingPage() {
 
   const [businessData, setBusinessData] = useState<BusinessData>({
     name: '',
-    location: '',
+    city: '',
+    state: '',
     industry: DEFAULT_INDUSTRY,
   });
 
@@ -62,11 +64,11 @@ export default function OnboardingPage() {
         // User already completed onboarding, redirect to dashboard
         router.push('/dashboard');
       } else {
-        // Fetch competitor limit
+        // Fetch competitor limit (use remaining capacity, not total limit)
         const limitRes = await fetch('/api/subscription/limit');
         if (limitRes.ok) {
           const limitData = await limitRes.json();
-          setCompetitorLimit(limitData.competitorLimit || 3);
+          setCompetitorLimit(limitData.remaining ?? limitData.competitorLimit ?? 3);
         }
         setCheckingStatus(false);
       }
@@ -118,39 +120,6 @@ export default function OnboardingPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Parse location to extract city and state
-  const parseLocation = (location: string): { city: string; state: string; zipcode: string } => {
-    // Try to extract city, state, and zipcode from location string
-    // Format examples: "Austin, TX" or "Austin, TX 78701" or "123 Main St, Austin, TX 78701"
-    const parts = location.split(',').map(p => p.trim());
-    let city = '';
-    let state = '';
-    let zipcode = '';
-
-    if (parts.length >= 2) {
-      const lastPart = parts[parts.length - 1];
-      const secondLastPart = parts[parts.length - 2];
-
-      // Try to extract zipcode from last part (e.g., "TX 78701")
-      const zipcodeMatch = lastPart.match(/\b(\d{5})\b/);
-      if (zipcodeMatch) {
-        zipcode = zipcodeMatch[1];
-      }
-
-      // Check if last part looks like "TX" or "TX 78701"
-      const stateMatch = lastPart.match(/\b([A-Z]{2})\b/);
-      if (stateMatch) {
-        city = secondLastPart;
-        state = stateMatch[1];
-      } else {
-        city = secondLastPart;
-        state = lastPart.substring(0, 2).toUpperCase();
-      }
-    }
-
-    return { city, state, zipcode };
   };
 
   // Handle AI-discovered competitors
@@ -346,18 +315,40 @@ export default function OnboardingPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Location (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={businessData.location}
-                  onChange={(e) => setBusinessData({ ...businessData, location: e.target.value })}
-                  placeholder="e.g., 123 Main St, New York, NY"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={loading}
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    City (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={businessData.city}
+                    onChange={(e) => setBusinessData({ ...businessData, city: e.target.value })}
+                    placeholder="e.g., Austin"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-2">
+                    State (Optional)
+                  </label>
+                  <select
+                    value={businessData.state}
+                    onChange={(e) => setBusinessData({ ...businessData, state: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={loading}
+                  >
+                    <option value="">Select</option>
+                    {['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+                      'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+                      'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+                      'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+                      'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'].map((st) => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -422,9 +413,8 @@ export default function OnboardingPage() {
                 onComplete={handleDiscoveryComplete}
                 onSkip={() => router.push('/dashboard/competitors/new')}
                 initialIndustry={businessData.industry}
-                initialCity={parseLocation(businessData.location).city}
-                initialState={parseLocation(businessData.location).state}
-                initialZipcode={parseLocation(businessData.location).zipcode}
+                initialCity={businessData.city}
+                initialState={businessData.state}
                 maxSelectable={competitorLimit}
               />
             </div>

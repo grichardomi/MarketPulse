@@ -29,13 +29,20 @@ export async function POST(req: Request) {
       where: { userId: user.id },
     });
 
+    // Build location string from city/state for backward compatibility
+    const location = validatedData.city && validatedData.state
+      ? `${validatedData.city}, ${validatedData.state}`
+      : validatedData.city || '';
+
     if (existingBusiness) {
       // Update existing business
       const updatedBusiness = await db.business.update({
         where: { id: existingBusiness.id },
         data: {
           name: validatedData.name,
-          location: validatedData.location,
+          location,
+          city: validatedData.city || null,
+          state: validatedData.state || null,
           industry: validatedData.industry,
           updatedAt: new Date(),
         },
@@ -52,7 +59,9 @@ export async function POST(req: Request) {
       data: {
         userId: user.id,
         name: validatedData.name,
-        location: validatedData.location,
+        location,
+        city: validatedData.city || null,
+        state: validatedData.state || null,
         industry: validatedData.industry || DEFAULT_INDUSTRY,
         updatedAt: new Date(),
       },
