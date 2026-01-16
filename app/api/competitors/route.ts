@@ -257,6 +257,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Handle Prisma unique constraint errors (P2002)
+    // This can happen due to race conditions when the same competitor is added simultaneously
+    if (error?.code === 'P2002') {
+      const target = error.meta?.target;
+
+      // Check if it's a duplicate URL constraint
+      if (target?.includes('url') || target?.includes('businessId_url')) {
+        return Response.json(
+          { error: 'This URL is already being monitored' },
+          { status: 409 }
+        );
+      }
+
+      // For other unique constraint errors (including id), return a retry-friendly error
+      return Response.json(
+        { error: 'Failed to create competitor due to a conflict. Please try again.' },
+        { status: 409 }
+      );
+    }
+
     return Response.json(
       { error: 'Failed to create competitor' },
       { status: 500 }

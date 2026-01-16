@@ -71,7 +71,7 @@ export async function getCached(
 }
 
 /**
- * Save discovery results to cache
+ * Save discovery results to cache with retry logic for race conditions
  */
 export async function saveToCache(
   industry: string,
@@ -79,41 +79,84 @@ export async function saveToCache(
   state: string,
   competitors: RankedCompetitor[]
 ): Promise<void> {
-  try {
-    const key = getCacheKey(industry, city, state);
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + CACHE_TTL_DAYS);
+  const key = getCacheKey(industry, city, state);
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + CACHE_TTL_DAYS);
 
-    const data: CachedDiscovery = {
-      competitors,
-      cachedAt: new Date().toISOString(),
-      expiresAt: expiresAt.toISOString(),
-    };
+  const data: CachedDiscovery = {
+    competitors,
+    cachedAt: new Date().toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
 
-    // Upsert (update if exists, create if not)
-    await prisma.competitorDiscoveryCache.upsert({
-      where: { cacheKey: key },
-      update: {
-        industry,
-        city,
-        state,
-        results: data as any,
-        expiresAt,
-        updatedAt: new Date(),
-      },
-      create: {
-        cacheKey: key,
-        industry,
-        city,
-        state,
-        results: data as any,
-        expiresAt,
-      },
-    });
-  } catch (error) {
-    console.error('Cache save error:', error);
-    // Don't throw - caching failure shouldn't break discovery
+  const maxRetries = 3;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Try update first (most common case for race conditions)
+      const updated = await prisma.competitorDiscoveryCache.updateMany({
+        where: { cacheKey: key },
+        data: {
+          industry,
+          city,
+          state,
+          results: data as any,
+          expiresAt,
+        },
+      });
+
+      // If no record was updated, create a new one
+      if (updated.count === 0) {
+        await prisma.competitorDiscoveryCache.create({
+          data: {
+            cacheKey: key,
+            industry,
+            city,
+            state,
+            results: data as any,
+            expiresAt,
+          },
+        });
+      }
+
+      // Success - exit retry loop
+      return;
+    } catch (error: any) {
+      // Handle P2002 (unique constraint) - another request already created the record
+      if (error?.code === 'P2002') {
+        if (attempt < maxRetries) {
+          // Wait a bit before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 50 * attempt));
+          continue;
+        }
+        // On final attempt, try one more update (the record should exist now)
+        try {
+          await prisma.competitorDiscoveryCache.updateMany({
+            where: { cacheKey: key },
+            data: {
+              industry,
+              city,
+              state,
+              results: data as any,
+              expiresAt,
+            },
+          });
+          return;
+        } catch (updateError) {
+          console.error('Cache save final update error:', updateError);
+        }
+      } else {
+        console.error('Cache save error:', error);
+      }
+
+      // For non-P2002 errors or final attempt failures, break the loop
+      if (error?.code !== 'P2002') {
+        break;
+      }
+    }
   }
+
+  // Don't throw - caching failure shouldn't break discovery
 }
 
 /**
