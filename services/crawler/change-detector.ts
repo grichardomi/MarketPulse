@@ -23,24 +23,30 @@ export async function detectChanges(
   newData: ExtractedData,
   newHash: string
 ): Promise<ChangeDetectionResult> {
-  // Get previous snapshot
-  const previousSnapshot = await db.priceSnapshot.findFirst({
+  // Get previous snapshot - skip the first result since the new snapshot
+  // may have already been created before this function is called
+  const snapshots = await db.priceSnapshot.findMany({
     where: { competitorId },
     orderBy: { detectedAt: 'desc' },
+    take: 2,
   });
 
-  // If no previous snapshot, this is first crawl - no changes to detect
-  if (!previousSnapshot) {
-    return {
-      hasChanges: false,
-      changeTypes: [],
-      message: 'First crawl - no previous data to compare',
-      details: { reason: 'first_crawl' },
-    };
-  }
+  // Find the previous snapshot (the one that's not the current crawl)
+  // If the most recent snapshot has the same hash, it's the one we just created
+  const previousSnapshot = snapshots.find(s => s.snapshotHash !== newHash) || null;
 
-  // Compare hashes for quick change detection
-  if (previousSnapshot.snapshotHash === newHash) {
+  // If no previous snapshot with different hash, this is first crawl or no changes
+  if (!previousSnapshot) {
+    // Check if this is truly a first crawl (only 0-1 snapshots exist)
+    if (snapshots.length <= 1) {
+      return {
+        hasChanges: false,
+        changeTypes: [],
+        message: 'First crawl - no previous data to compare',
+        details: { reason: 'first_crawl' },
+      };
+    }
+    // Multiple snapshots exist but all have same hash = no changes
     return {
       hasChanges: false,
       changeTypes: [],
