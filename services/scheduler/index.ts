@@ -24,14 +24,16 @@ export async function enqueueJobs(): Promise<SchedulerResult> {
     }
 
     const gracePeriodDays = TRIAL_CONFIG.gracePeriodDays;
+    const trialDurationDays = TRIAL_CONFIG.durationDays;
 
     // Find active competitors that are due for crawling
-    // Only include competitors from users with active subscriptions
+    // Include: users with active subscriptions OR users still in trial period (no subscription needed)
     const dueCompetitors = await db.$queryRaw<any[]>`
       SELECT c.id, c.url, c."crawlFrequencyMinutes", c."lastCrawledAt"
       FROM "Competitor" c
       INNER JOIN "Business" b ON c."businessId" = b.id
-      INNER JOIN "Subscription" s ON s."userId" = b."userId"
+      INNER JOIN "User" u ON b."userId" = u.id
+      LEFT JOIN "Subscription" s ON s."userId" = b."userId"
       WHERE c."isActive" = true
         AND (
           c."lastCrawledAt" IS NULL
@@ -41,14 +43,17 @@ export async function enqueueJobs(): Promise<SchedulerResult> {
           SELECT 1 FROM "CrawlQueue" cq
           WHERE cq."competitorId" = c.id
         )
-        -- Include active, trialing (not expired), and grace_period
-        -- Exclude paused subscriptions
         AND (
-          s.status = 'active'
+          -- Trial users without subscription (still in trial period)
+          (s.id IS NULL AND u."trialStartedAt" + (${trialDurationDays} * INTERVAL '1 day') > NOW())
+          -- Or users with active subscription
+          OR (s.status = 'active')
+          -- Or users with trialing subscription (not expired)
           OR (s.status = 'trialing' AND s."currentPeriodEnd" > NOW())
+          -- Or users in grace period
           OR (s.status = 'grace_period' AND s."currentPeriodEnd" + (${gracePeriodDays} * INTERVAL '1 day') > NOW())
         )
-        AND s.status != 'paused'
+        AND (s.id IS NULL OR s.status != 'paused')
       ORDER BY c."lastCrawledAt" ASC NULLS FIRST
       LIMIT 100
     `;
@@ -171,25 +176,30 @@ export async function getQueueStats(): Promise<{
 export async function getCompetitorsDue(limit: number = 10): Promise<any[]> {
   try {
     const gracePeriodDays = TRIAL_CONFIG.gracePeriodDays;
+    const trialDurationDays = TRIAL_CONFIG.durationDays;
 
     const due = await db.$queryRaw<any[]>`
       SELECT c.id, c.name, c.url, c."lastCrawledAt", c."crawlFrequencyMinutes"
       FROM "Competitor" c
       INNER JOIN "Business" b ON c."businessId" = b.id
-      INNER JOIN "Subscription" s ON s."userId" = b."userId"
+      INNER JOIN "User" u ON b."userId" = u.id
+      LEFT JOIN "Subscription" s ON s."userId" = b."userId"
       WHERE c."isActive" = true
         AND (
           c."lastCrawledAt" IS NULL
           OR c."lastCrawledAt" + (c."crawlFrequencyMinutes" * INTERVAL '1 minute') < NOW()
         )
-        -- Include active, trialing (not expired), and grace_period
-        -- Exclude paused subscriptions
         AND (
-          s.status = 'active'
+          -- Trial users without subscription (still in trial period)
+          (s.id IS NULL AND u."trialStartedAt" + (${trialDurationDays} * INTERVAL '1 day') > NOW())
+          -- Or users with active subscription
+          OR (s.status = 'active')
+          -- Or users with trialing subscription (not expired)
           OR (s.status = 'trialing' AND s."currentPeriodEnd" > NOW())
+          -- Or users in grace period
           OR (s.status = 'grace_period' AND s."currentPeriodEnd" + (${gracePeriodDays} * INTERVAL '1 day') > NOW())
         )
-        AND s.status != 'paused'
+        AND (s.id IS NULL OR s.status != 'paused')
       ORDER BY c."lastCrawledAt" ASC NULLS FIRST
       LIMIT ${limit}
     `;
