@@ -1,14 +1,10 @@
 import {
-  Body,
   Button,
-  Container,
-  Head,
   Heading,
-  Html,
-  Preview,
   Section,
   Text,
 } from '@react-email/components';
+import EmailLayout from './components/EmailLayout';
 
 interface SupportTicketCreatedEmailProps {
   ticketId: number;
@@ -34,84 +30,62 @@ export default function SupportTicketCreatedEmail({
   const priorityLabel = priority === 'dedicated' ? 'DEDICATED' : priority === 'priority' ? 'PRIORITY' : 'STANDARD';
 
   return (
-    <Html>
-      <Head />
-      <Preview>{previewText}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          <Heading style={h1}>New Support Ticket</Heading>
+    <EmailLayout
+      previewText={previewText}
+      footerText="You received this email because you are a support team member at MarketPulse."
+    >
+      <Heading style={h1}>New Support Ticket</Heading>
 
-          <Section style={prioritySection}>
-            <Text style={{ ...priorityBadge, backgroundColor: priorityColor }}>
-              {priorityLabel} SUPPORT
-            </Text>
-          </Section>
+      <Section style={prioritySection}>
+        <Text style={{ ...priorityBadge, backgroundColor: priorityColor }}>
+          {priorityLabel} SUPPORT
+        </Text>
+      </Section>
 
-          <Section style={section}>
-            <Text style={label}>Ticket ID:</Text>
-            <Text style={value}>#{ticketId}</Text>
+      <Section style={section}>
+        <Text style={label}>Ticket ID:</Text>
+        <Text style={value}>#{ticketId}</Text>
 
-            <Text style={label}>From:</Text>
-            <Text style={value}>{userName} ({userEmail})</Text>
+        <Text style={label}>From:</Text>
+        <Text style={value}>{userName} ({userEmail})</Text>
 
-            <Text style={label}>Category:</Text>
-            <Text style={value}>{category}</Text>
+        <Text style={label}>Category:</Text>
+        <Text style={value}>{category}</Text>
 
-            <Text style={label}>Subject:</Text>
-            <Text style={value}>{subject}</Text>
+        <Text style={label}>Subject:</Text>
+        <Text style={value}>{subject}</Text>
 
-            <Text style={label}>Description:</Text>
-            <Text style={descriptionStyle}>{description}</Text>
-          </Section>
+        <Text style={label}>Description:</Text>
+        <Text style={descriptionStyle}>{description}</Text>
+      </Section>
 
-          <Section style={buttonSection}>
-            <Button
-              style={button}
-              href={`${process.env.NEXT_PUBLIC_APP_URL}/admin/support/${ticketId}`}
-            >
-              View & Respond to Ticket
-            </Button>
-          </Section>
+      <Section style={buttonSection}>
+        <Button
+          style={button}
+          href={`${process.env.NEXT_PUBLIC_APP_URL}/admin/support/${ticketId}`}
+        >
+          View & Respond to Ticket
+        </Button>
+      </Section>
 
-          {priority !== 'standard' && (
-            <Section style={urgentSection}>
-              <Text style={urgentText}>
-                {priority === 'dedicated'
-                  ? '⚡ This is a DEDICATED support customer. Please respond within 4 hours.'
-                  : '⚡ This is a PRIORITY support customer. Please respond within 24 hours.'}
-              </Text>
-            </Section>
-          )}
-
-          <Section style={footerSection}>
-            <Text style={footerText}>
-              You received this email because you are a support team member at MarketPulse.
-            </Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+      {priority !== 'standard' && (
+        <Section style={urgentSection}>
+          <Text style={urgentText}>
+            {priority === 'dedicated'
+              ? '⚡ This is a DEDICATED support customer. Please respond within 4 hours.'
+              : '⚡ This is a PRIORITY support customer. Please respond within 24 hours.'}
+          </Text>
+        </Section>
+      )}
+    </EmailLayout>
   );
 }
-
-const main = {
-  backgroundColor: '#f6f9fc',
-  fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
-};
-
-const container = {
-  backgroundColor: '#ffffff',
-  margin: '0 auto',
-  padding: '20px 0 48px',
-  marginBottom: '64px',
-  maxWidth: '600px',
-};
 
 const h1 = {
   color: '#1f2937',
   fontSize: '32px',
   fontWeight: 'bold',
-  margin: '40px 0',
+  margin: '0 0 24px',
   padding: '0 40px',
 };
 
@@ -192,20 +166,6 @@ const urgentText = {
   color: '#92400e',
   fontSize: '14px',
   fontWeight: '600',
-  margin: 0,
-  textAlign: 'center' as const,
-};
-
-const footerSection = {
-  padding: '24px 40px',
-  borderTop: '1px solid #e5e7eb',
-  marginTop: '32px',
-};
-
-const footerText = {
-  color: '#6b7280',
-  fontSize: '12px',
-  lineHeight: '18px',
   margin: 0,
   textAlign: 'center' as const,
 };

@@ -1,16 +1,11 @@
 import * as React from 'react';
 import {
-  Body,
   Button,
-  Container,
-  Head,
   Heading,
-  Html,
-  Link,
-  Preview,
   Section,
   Text,
 } from '@react-email/components';
+import EmailLayout from './components/EmailLayout';
 
 interface AlertEmailProps {
   competitorName?: string;
@@ -49,56 +44,38 @@ export default function AlertNotification({
     alertTypeColors[alertType] || alertTypeColors.price_change;
 
   return (
-    <Html>
-      <Head />
-      <Preview>{`${typeInfo.emoji} ${typeInfo.label} at ${competitorName}`}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          {/* Header */}
-          <Section style={header}>
-            <Heading style={h1}>MarketPulse</Heading>
-          </Section>
+    <EmailLayout
+      previewText={`${typeInfo.emoji} ${typeInfo.label} at ${competitorName}`}
+      footerText={`You're receiving this because you enabled email notifications for ${alertType.replace('_', ' ')}.`}
+      settingsUrl={unsubscribeUrl}
+    >
+      {/* Alert Badge */}
+      <Section style={{ backgroundColor: badgeColor, padding: '12px 20px' }}>
+        <Text style={badgeText}>
+          {typeInfo.emoji} {typeInfo.label}
+        </Text>
+      </Section>
 
-          {/* Alert Badge */}
-          <Section style={{ backgroundColor: badgeColor, padding: '12px 20px' }}>
-            <Text style={badgeText}>
-              {typeInfo.emoji} {typeInfo.label}
-            </Text>
-          </Section>
+      {/* Main Content */}
+      <Section style={content}>
+        <Heading as="h2" style={h2}>
+          Update at {competitorName}
+        </Heading>
+        <Text style={paragraph}>{message}</Text>
 
-          {/* Main Content */}
-          <Section style={content}>
-            <Heading as="h2" style={h2}>
-              Update at {competitorName}
-            </Heading>
-            <Text style={paragraph}>{message}</Text>
+        {/* Details Section */}
+        {details &&
+          Object.keys(details).length > 0 &&
+          renderDetails(details, alertType)}
 
-            {/* Details Section */}
-            {details &&
-              Object.keys(details).length > 0 &&
-              renderDetails(details, alertType)}
-
-            {/* CTA Button */}
-            <Section style={buttonContainer}>
-              <Button style={button} href={dashboardUrl}>
-                View in Dashboard
-              </Button>
-            </Section>
-          </Section>
-
-          {/* Footer */}
-          <Section style={footer}>
-            <Text style={footerText}>
-              You're receiving this because you enabled email notifications for{' '}
-              {alertType.replace('_', ' ')}.
-            </Text>
-            <Link href={unsubscribeUrl} style={link}>
-              Manage notification preferences
-            </Link>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
+        {/* CTA Button */}
+        <Section style={buttonContainer}>
+          <Button style={button} href={dashboardUrl}>
+            View in Dashboard
+          </Button>
+        </Section>
+      </Section>
+    </EmailLayout>
   );
 }
 
@@ -153,33 +130,6 @@ function renderDetails(
 }
 
 // Styles
-const main = {
-  backgroundColor: '#f6f9fc',
-  fontFamily:
-    '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
-};
-
-const container = {
-  backgroundColor: '#ffffff',
-  margin: '0 auto',
-  padding: '20px 0 48px',
-  marginBottom: '64px',
-  maxWidth: '600px',
-};
-
-const header = {
-  padding: '32px 20px',
-  textAlign: 'center' as const,
-  borderBottom: '1px solid #e5e7eb',
-};
-
-const h1 = {
-  color: '#1f2937',
-  fontSize: '28px',
-  fontWeight: '700' as const,
-  margin: '0',
-};
-
 const badgeText = {
   color: '#ffffff',
   fontSize: '16px',
@@ -246,23 +196,4 @@ const button = {
   textAlign: 'center' as const,
   display: 'inline-block',
   padding: '12px 32px',
-};
-
-const footer = {
-  borderTop: '1px solid #e5e7eb',
-  padding: '24px 20px',
-  textAlign: 'center' as const,
-};
-
-const footerText = {
-  color: '#6b7280',
-  fontSize: '14px',
-  lineHeight: '1.6',
-  margin: '0 0 8px',
-};
-
-const link = {
-  color: '#3B82F6',
-  fontSize: '14px',
-  textDecoration: 'underline',
 };
