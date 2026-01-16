@@ -8,6 +8,7 @@ import TrialEnded from '@/emails/trial-ended';
 import GracePeriodEnded from '@/emails/grace-period-ended';
 import EmailChangeVerification from '@/emails/email-change-verification';
 import EmailChangeNotification from '@/emails/email-change-notification';
+import WeeklySummary from '@/emails/weekly-summary';
 
 interface RenderEmailParams {
   templateName: string;
@@ -38,6 +39,7 @@ export async function renderEmailTemplate({
       grace_period_ended: GracePeriodEnded,
       'email-change-verification': EmailChangeVerification,
       'email-change-notification': EmailChangeNotification,
+      weekly_summary: WeeklySummary,
     };
 
     const TemplateComponent = templates[templateName];
@@ -89,6 +91,7 @@ export function generateSubject(alertType: string, competitorName?: string): str
     grace_period_ended: 'Your MarketPulse access has expired',
     'email-change-verification': 'Verify your new email address',
     'email-change-notification': '🔔 Security Alert: Email change requested',
+    weekly_summary: '📊 Your Weekly Competitive Intelligence Report',
   };
 
   return subjects[alertType] || (competitorName ? `Update at ${competitorName}` : 'MarketPulse Update');
