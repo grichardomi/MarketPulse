@@ -19,7 +19,7 @@ interface EmailLayoutProps {
 }
 
 // Base URL for assets - should match your deployed app URL
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://marketpulse.com';
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://getmarketpulse.com';
 
 export default function EmailLayout({
   children,
